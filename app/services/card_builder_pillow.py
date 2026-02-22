@@ -2,11 +2,11 @@
 Card Builder (Pillow) — composites a fact card from the channel's template
 using pure Python image manipulation. No AI calls needed.
 
-Layout:
-- Top area: Title (bold, large) + body text (regular)
-- Bottom area: Related image (fill-to-fit)
+Layout (matching reference design):
+- Top area: Channel logo/name (baked into template)
+- Main area: Fact body text (large, white, left-aligned — fills most of card)
+- Bottom area: Related image (fill-to-fit, ~30% of card)
 - Bottom-left: Source attribution (small text)
-- Uses channel colors, Inter font
 """
 
 import io
@@ -29,18 +29,15 @@ logger = logging.getLogger(__name__)
 # Font paths
 FONT_PATH = FONTS_DIR / "Inter.ttf"
 
-# Fallback font sizes
-TITLE_SIZE = 42
-BODY_SIZE = 28
+# Font sizes — body is the star, title is secondary
+BODY_SIZE = 38
 SOURCE_SIZE = 18
 
 
-def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+def _load_font(size: int) -> ImageFont.FreeTypeFont:
     """Load Inter font at given size."""
     try:
-        # Inter variable font — use higher weight for bold
-        font = ImageFont.truetype(str(FONT_PATH), size)
-        return font
+        return ImageFont.truetype(str(FONT_PATH), size)
     except Exception:
         logger.warning("Inter font not found, using default")
         return ImageFont.load_default()
@@ -67,6 +64,15 @@ def _wrap_text(draw: ImageDraw.Draw, text: str, font: ImageFont.FreeTypeFont, ma
     return lines or [""]
 
 
+def _measure_text_height(draw: ImageDraw.Draw, lines: list[str], font: ImageFont.FreeTypeFont, spacing: int = 8) -> int:
+    """Calculate total height of wrapped text lines."""
+    total = 0
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        total += bbox[3] - bbox[1] + spacing
+    return total
+
+
 def build_card_pillow(
     channel: ChannelConfig,
     title: str,
@@ -77,10 +83,9 @@ def build_card_pillow(
     """
     Build a card image using Pillow (no AI).
 
-    Layout on the template:
-    - Title text: top portion, left-aligned, accent color
-    - Body text: below title, left-aligned, WHITE
-    - Related image: lower portion, fill-to-fit
+    Layout (matching reference):
+    - Body text: large, white, left-aligned — fills the majority of the card
+    - Related image: below body text, fills remaining space
     - Source: bottom-left corner, small text
 
     Returns PNG bytes on a 1080×1920 transparent canvas.
@@ -101,58 +106,59 @@ def build_card_pillow(
         draw = ImageDraw.Draw(template)
 
         # Load fonts
-        title_font = _load_font(TITLE_SIZE, bold=True)
-        body_font = _load_font(BODY_SIZE)
         source_font = _load_font(SOURCE_SIZE)
 
-        # Colors
-        accent_color = channel.accent_color or "#e94560"
-
-        # ── Layout zones (relative to template size) ──
-        padding = int(tw * 0.06)  # 6% padding
+        # ── Layout zones ──
+        padding = int(tw * 0.05)  # 5% padding on each side
         text_max_w = tw - (padding * 2)
 
-        # Text zone: top 18% to 60% of template
-        text_zone_top = int(th * 0.18)  # Below logo area
+        # Text starts below the logo/header area (top ~10% of template)
+        text_start_y = int(th * 0.10)
 
-        # ── Draw title (left-aligned, accent color) ──
-        title_lines = _wrap_text(draw, title.upper(), title_font, text_max_w)
-        y = text_zone_top
-        for line in title_lines:
-            bbox = draw.textbbox((0, 0), line, font=title_font)
-            x = padding  # Left-aligned
-            # Shadow
-            draw.text((x + 2, y + 2), line, font=title_font, fill="#00000088")
-            draw.text((x, y), line, font=title_font, fill=accent_color)
-            y += bbox[3] - bbox[1] + 8
+        # Source zone at the very bottom
+        source_y = int(th * 0.93)
 
-        # ── Draw body (left-aligned, always WHITE) ──
-        y += 16  # Gap between title and body
-        body_lines = _wrap_text(draw, body, body_font, text_max_w)
+        # Image zone ends just above source text
+        img_zone_bottom = int(th * 0.90)
 
-        # Calculate where the image zone should start (after body text)
-        body_end_y = y
+        # ── Auto-size body font to fill available space ──
+        # Start with large font and shrink if text doesn't fit
+        # Target: text fills from text_start_y to about 60-70% of card
+        max_text_zone_height = int(th * 0.55)  # Max 55% of card for text
+
+        body_text = body
+        font_size = BODY_SIZE
+        body_font = _load_font(font_size)
+        body_lines = _wrap_text(draw, body_text, body_font, text_max_w)
+        text_height = _measure_text_height(draw, body_lines, body_font, spacing=10)
+
+        # Shrink font if body text overflows allocated zone
+        while text_height > max_text_zone_height and font_size > 22:
+            font_size -= 2
+            body_font = _load_font(font_size)
+            body_lines = _wrap_text(draw, body_text, body_font, text_max_w)
+            text_height = _measure_text_height(draw, body_lines, body_font, spacing=10)
+
+        logger.info(f"Body font size: {font_size}px, {len(body_lines)} lines")
+
+        # ── Draw body text (left-aligned, WHITE) ──
+        y = text_start_y
+        line_spacing = 10
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=body_font)
-            body_end_y += bbox[3] - bbox[1] + 6
-        body_end_y += 20  # Buffer space
-
-        for line in body_lines:
-            bbox = draw.textbbox((0, 0), line, font=body_font)
             x = padding  # Left-aligned
-            # Shadow
-            draw.text((x + 1, y + 1), line, font=body_font, fill="#00000088")
-            draw.text((x, y), line, font=body_font, fill="#ffffff")  # Always white
-            y += bbox[3] - bbox[1] + 6
+            # Shadow for readability
+            draw.text((x + 2, y + 2), line, font=body_font, fill="#00000099")
+            # White text
+            draw.text((x, y), line, font=body_font, fill="#ffffff")
+            y += bbox[3] - bbox[1] + line_spacing
 
         # ── Place related image (below body text) ──
-        # Image zone starts after body text, uses remaining space
-        img_zone_top = max(body_end_y, int(th * 0.48))
-        img_zone_bottom = int(th * 0.88)
+        img_zone_top = y + 20  # 20px gap after text
         img_zone_w = tw - (padding * 2)
         img_zone_h = img_zone_bottom - img_zone_top
 
-        if related_image and img_zone_h > 50:
+        if related_image and img_zone_h > 80:
             try:
                 img = Image.open(io.BytesIO(related_image)).convert("RGBA")
 
@@ -169,7 +175,7 @@ def build_card_pillow(
 
                 img = img.resize((new_w, new_h), Image.LANCZOS)
 
-                # Center crop
+                # Center crop to fit zone
                 cx = (new_w - img_zone_w) // 2
                 cy = (new_h - img_zone_h) // 2
                 img = img.crop((cx, cy, cx + img_zone_w, cy + img_zone_h))
@@ -178,12 +184,17 @@ def build_card_pillow(
                 img = _round_corners(img, radius=16)
 
                 template.paste(img, (padding, img_zone_top), img)
+                logger.info(f"Placed image at y={img_zone_top}, size={img_zone_w}x{img_zone_h}")
             except Exception as e:
                 logger.warning(f"Failed to place related image: {e}")
+        else:
+            if not related_image:
+                logger.warning("No related image provided for card")
+            elif img_zone_h <= 80:
+                logger.warning(f"Not enough space for image (only {img_zone_h}px available)")
 
         # ── Draw source attribution ──
         source_text = image_source if image_source else "source: web"
-        source_y = int(th * 0.91)
         draw.text(
             (padding, source_y), source_text,
             font=source_font, fill="#ffffff88",
