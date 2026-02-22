@@ -12,7 +12,8 @@
       "keys": [],
       "cycling": false
     },
-    "google_cse_cx": ""
+    "google_cse_cx": "",
+    "telegram_bot_token": "8305191979:AAG_jcSCOYtIcgOxNtwAS0QB54WZIcdnxro"
   },
   "channels": [
     {
@@ -24,6 +25,26 @@
       "sound_mode": "random",
       "sound_file": null,
       "video_duration": 5
+    },
+    {
+      "name": "test channel",
+      "slug": "test_channel",
+      "description": "",
+      "primary_color": "#1a1a2e",
+      "accent_color": "#e94560",
+      "text_color": "#ffffff",
+      "card_mode": "pillow",
+      "sound_mode": "none",
+      "sound_file": null,
+      "video_duration": 3,
+      "youtube_tokens": {}
+    }
+  ],
+  "cron_jobs": [],
+  "team_members": [
+    {
+      "name": "Mohamed",
+      "chat_id": 825418125
     }
   ]
 }

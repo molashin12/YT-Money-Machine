@@ -53,8 +53,11 @@ class ChannelCreationStates(StatesGroup):
 async def cmd_start(message: Message, state: FSMContext):
     """Handle /start command."""
     await state.clear()
+    chat_id = message.chat.id
     await message.answer(
         "👋 **Welcome to the YouTube Shorts Bot!**\n\n"
+        f"🆔 **Your Chat ID:** `{chat_id}`\n"
+        "_(Copy this to add yourself as a team member in the Admin Dashboard)_\n\n"
         "Send me any of the following:\n"
         "• 📝 Text with a fact or info\n"
         "• 🖼️ An image (with or without caption)\n"
