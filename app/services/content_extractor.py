@@ -65,10 +65,12 @@ async def extract_from_url(url: str, channel_description: str = "") -> dict:
         # Download video
         ydl_opts = {
             "outtmpl": f"{tmp_dir}/%(id)s.%(ext)s",
-            "format": "best[height<=720]",
+            # Fallback chain: try 720p → best single file → absolute best
+            "format": "best[height<=720]/best/bestvideo+bestaudio",
             "noplaylist": True,
             "quiet": True,
             "no_warnings": True,
+            "merge_output_format": "mp4",
         }
 
         video_path = None
