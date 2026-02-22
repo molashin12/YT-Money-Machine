@@ -59,8 +59,9 @@ async def extract_from_url(url: str, channel_description: str = "") -> dict:
 
     Download strategies (tries in order):
     1. yt-dlp with login-bypass options
-    2. yt-dlp with transformed URL (embed/mobile)
-    3. Cobalt API (open-source video downloader)
+    2. Instaloader (Instagram only — works without login)
+    3. yt-dlp with transformed URL (embed/mobile)
+    4. Cobalt API (open-source video downloader)
     """
     logger.info(f"Extracting content from URL: {url}")
 
@@ -72,14 +73,18 @@ async def extract_from_url(url: str, channel_description: str = "") -> dict:
         # ── Strategy 1: yt-dlp with bypass options ──
         video_path, video_title, video_desc = await _download_ytdlp(url, tmp_dir)
 
-        # ── Strategy 2: yt-dlp with transformed URL ──
+        # ── Strategy 2: Instaloader (Instagram only) ──
+        if not video_path and "instagram.com" in url:
+            video_path = await _download_instaloader(url, tmp_dir)
+
+        # ── Strategy 3: yt-dlp with transformed URL ──
         if not video_path:
             alt_url = _transform_url(url)
             if alt_url and alt_url != url:
                 logger.info(f"Trying transformed URL: {alt_url}")
                 video_path, video_title, video_desc = await _download_ytdlp(alt_url, tmp_dir)
 
-        # ── Strategy 3: Cobalt API ──
+        # ── Strategy 4: Cobalt API ──
         if not video_path:
             video_path = await _download_cobalt(url, tmp_dir)
 
@@ -176,6 +181,53 @@ async def _download_ytdlp(url: str, tmp_dir: str) -> tuple:
         logger.warning(f"yt-dlp download failed: {e}")
 
     return (None, "", "")
+
+
+async def _download_instaloader(url: str, tmp_dir: str) -> Optional[Path]:
+    """Download Instagram video/reel using Instaloader (no login needed for public posts)."""
+    try:
+        import instaloader
+
+        logger.info("Trying Instaloader for Instagram download...")
+
+        # Extract shortcode from URL
+        ig_match = re.search(r"instagram\.com/(?:reel|p)/([A-Za-z0-9_-]+)", url)
+        if not ig_match:
+            logger.warning("Could not extract Instagram shortcode from URL")
+            return None
+
+        shortcode = ig_match.group(1)
+        logger.info(f"Instagram shortcode: {shortcode}")
+
+        # Create Instaloader instance (no login)
+        L = instaloader.Instaloader(
+            download_videos=True,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False,
+            compress_json=False,
+            dirname_pattern=tmp_dir,
+            filename_pattern="{shortcode}",
+            quiet=True,
+        )
+
+        # Download the post
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+        L.download_post(post, target=Path(tmp_dir))
+
+        # Find downloaded video file
+        for f in Path(tmp_dir).rglob("*"):
+            if f.is_file() and f.suffix in (".mp4", ".webm", ".mkv", ".mov"):
+                logger.info(f"Instaloader downloaded: {f.name}")
+                return f
+
+        logger.warning("Instaloader completed but no video file found")
+
+    except Exception as e:
+        logger.warning(f"Instaloader download failed: {e}")
+
+    return None
 
 
 def _transform_url(url: str) -> Optional[str]:

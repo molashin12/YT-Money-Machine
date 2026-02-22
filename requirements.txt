@@ -12,3 +12,4 @@ aiofiles>=24.1.0
 APScheduler>=3.10.0
 google-api-python-client>=2.0.0
 google-auth-oauthlib>=1.0.0
+instaloader>=4.10.0

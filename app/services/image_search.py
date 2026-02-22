@@ -229,10 +229,29 @@ async def _pexels_image_search(keywords: list[str], api_key: str) -> Optional[Im
         return None
 
 
+# Domains that serve watermarked/paid stock images — skip these
+STOCK_DOMAINS = {
+    "stock.adobe.com", "adobe.com",
+    "shutterstock.com",
+    "gettyimages.com", "gettyimages.co.uk",
+    "istockphoto.com", "istock.com",
+    "alamy.com",
+    "depositphotos.com",
+    "dreamstime.com",
+    "123rf.com",
+    "bigstockphoto.com",
+    "canstockphoto.com",
+    "pond5.com",
+    "dissolve.com",
+    "stocksy.com",
+}
+
+
 async def _bing_image_search(keywords: list[str]) -> Optional[ImageResult]:
     """
     Search Bing Images without an API key (scraping public results).
     Uses Bing's public image search with safe search enabled.
+    Filters out stock photo sites to avoid watermarked images.
     """
     try:
         import random
@@ -252,7 +271,7 @@ async def _bing_image_search(keywords: list[str]) -> Optional[ImageResult]:
                 params={
                     "q": query,
                     "first": 1,
-                    "count": 20,
+                    "count": 30,
                     "safesearch": "Strict",
                     "qft": "+filterui:imagesize-large",
                 },
@@ -278,9 +297,15 @@ async def _bing_image_search(keywords: list[str]) -> Optional[ImageResult]:
         urls = list(dict.fromkeys(urls))  # Preserve order, remove dupes
         random.shuffle(urls)
 
-        for img_url in urls[:8]:
+        for img_url in urls[:15]:
             try:
                 domain = urlparse(img_url).netloc.replace("www.", "")
+
+                # Skip stock photo sites (watermarked images)
+                if any(stock in domain for stock in STOCK_DOMAINS):
+                    logger.debug(f"Skipping stock image from: {domain}")
+                    continue
+
                 async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
                     img_resp = await client.get(img_url)
                     if (img_resp.status_code == 200
