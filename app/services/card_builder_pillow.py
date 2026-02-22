@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 # Font paths
 FONT_PATH = FONTS_DIR / "Inter.ttf"
 
-# Font sizes — body is the star, title is secondary
-BODY_SIZE = 38
+# Font sizes — body is the star, fills most of the card
+BODY_SIZE = 52
 SOURCE_SIZE = 18
 
 
@@ -122,28 +122,28 @@ def build_card_pillow(
         img_zone_bottom = int(th * 0.90)
 
         # ── Auto-size body font to fill available space ──
-        # Start with large font and shrink if text doesn't fit
-        # Target: text fills from text_start_y to about 60-70% of card
-        max_text_zone_height = int(th * 0.55)  # Max 55% of card for text
+        # Start with large font and shrink if text is too long
+        # Target: text fills from text_start_y to about 70% of card
+        max_text_zone_height = int(th * 0.70)  # Up to 70% of card for text
 
         body_text = body
         font_size = BODY_SIZE
         body_font = _load_font(font_size)
         body_lines = _wrap_text(draw, body_text, body_font, text_max_w)
-        text_height = _measure_text_height(draw, body_lines, body_font, spacing=10)
+        text_height = _measure_text_height(draw, body_lines, body_font, spacing=12)
 
         # Shrink font if body text overflows allocated zone
-        while text_height > max_text_zone_height and font_size > 22:
+        while text_height > max_text_zone_height and font_size > 28:
             font_size -= 2
             body_font = _load_font(font_size)
             body_lines = _wrap_text(draw, body_text, body_font, text_max_w)
-            text_height = _measure_text_height(draw, body_lines, body_font, spacing=10)
+            text_height = _measure_text_height(draw, body_lines, body_font, spacing=12)
 
         logger.info(f"Body font size: {font_size}px, {len(body_lines)} lines")
 
         # ── Draw body text (left-aligned, WHITE) ──
         y = text_start_y
-        line_spacing = 10
+        line_spacing = 12
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=body_font)
             x = padding  # Left-aligned
