@@ -1,15 +1,25 @@
 {
   "api_keys": {
     "gemini": {
-      "keys": [],
+      "keys": [
+        "AIzaSyDMduWGKAXFUMGxKpab53GR65vhs1DR0A0",
+        "AIzaSyC_CL2gEcTnuxbTY048HJY05bFcfC8fqNg",
+        "AIzaSyAEBeqnX1Q5IwEXxuxWOxO0tT70aJGg0rQ",
+        "AIzaSyCKY4P0eNp-WYhiEcxOG5DDzoeZPWEFaSY",
+        "AIzaSyCOXclCOS2Lc7Yrs0Svhy3zyfSw5TdKKJo"
+      ],
       "cycling": true
     },
     "pexels": {
-      "keys": [],
+      "keys": [
+        "N6doVsXNQIPaiXOCSebApqXxXMr34vUYceuEQTC3f5sUxTDFTpyQnfEp"
+      ],
       "cycling": false
     },
     "google_cse": {
-      "keys": [],
+      "keys": [
+        "AIzaSyCVmHKUHlxQOmqD5u6GznyIKtqcv21Nze0"
+      ],
       "cycling": false
     },
     "google_cse_cx": "",
@@ -17,14 +27,16 @@
   },
   "channels": [
     {
-      "name": "Amazing Facts",
+      "name": "horror archive",
       "slug": "amazing_facts",
       "primary_color": "#1a1a2e",
       "accent_color": "#e94560",
       "text_color": "#ffffff",
-      "sound_mode": "random",
+      "sound_mode": "none",
       "sound_file": null,
-      "video_duration": 5
+      "video_duration": 5,
+      "description": "horror channel talks about history horror facts ",
+      "card_mode": "pillow"
     },
     {
       "name": "test channel",

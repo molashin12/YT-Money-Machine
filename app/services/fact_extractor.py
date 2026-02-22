@@ -33,7 +33,7 @@ Given the following raw content, extract the SINGLE most interesting, surprising
 Format your response as JSON with these exact keys:
 {{
   "title": "Short catchy headline (3-6 words, no period)",
-  "body": "The fact explained clearly in 1-3 short sentences. Keep it punchy and engaging for social media. Maximum 200 characters.",
+  "body": "A detailed, engaging retelling of the fact in 5-8 sentences (400-600 characters). Write it like a compelling social media post — start with a hook, build the story with vivid details, and end with a punchy conclusion. Make readers want to share it.",
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "yt_title": "A catchy YouTube Shorts video title (max 70 chars, include an emoji)",
   "yt_description": "A brief YouTube description (2-3 sentences, engaging, include a call to action like 'Follow for more!')",
