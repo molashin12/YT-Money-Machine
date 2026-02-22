@@ -78,8 +78,8 @@ def build_card_pillow(
     Build a card image using Pillow (no AI).
 
     Layout on the template:
-    - Title text: top portion, centered, large bold
-    - Body text: below title, centered, medium
+    - Title text: top portion, left-aligned, accent color
+    - Body text: below title, left-aligned, WHITE
     - Related image: lower portion, fill-to-fit
     - Source: bottom-left corner, small text
 
@@ -105,50 +105,54 @@ def build_card_pillow(
         body_font = _load_font(BODY_SIZE)
         source_font = _load_font(SOURCE_SIZE)
 
-        # Colors from channel config
-        text_color = channel.text_color or "#ffffff"
+        # Colors
         accent_color = channel.accent_color or "#e94560"
 
         # ── Layout zones (relative to template size) ──
         padding = int(tw * 0.06)  # 6% padding
         text_max_w = tw - (padding * 2)
 
-        # Text zone: top 35% of template
-        text_zone_top = int(th * 0.18)  # Start at 18% (below logo area)
-        text_zone_bottom = int(th * 0.45)
+        # Text zone: top 18% to 60% of template
+        text_zone_top = int(th * 0.18)  # Below logo area
 
-        # Image zone: 48% to 88% of template height
-        img_zone_top = int(th * 0.48)
-        img_zone_bottom = int(th * 0.88)
-        img_zone_w = tw - (padding * 2)
-        img_zone_h = img_zone_bottom - img_zone_top
-
-        # ── Draw title ──
+        # ── Draw title (left-aligned, accent color) ──
         title_lines = _wrap_text(draw, title.upper(), title_font, text_max_w)
         y = text_zone_top
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line, font=title_font)
-            line_w = bbox[2] - bbox[0]
-            x = (tw - line_w) // 2  # Center
+            x = padding  # Left-aligned
             # Shadow
             draw.text((x + 2, y + 2), line, font=title_font, fill="#00000088")
             draw.text((x, y), line, font=title_font, fill=accent_color)
             y += bbox[3] - bbox[1] + 8
 
-        # ── Draw body ──
-        y += 12  # Gap between title and body
+        # ── Draw body (left-aligned, always WHITE) ──
+        y += 16  # Gap between title and body
         body_lines = _wrap_text(draw, body, body_font, text_max_w)
+
+        # Calculate where the image zone should start (after body text)
+        body_end_y = y
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=body_font)
-            line_w = bbox[2] - bbox[0]
-            x = (tw - line_w) // 2
+            body_end_y += bbox[3] - bbox[1] + 6
+        body_end_y += 20  # Buffer space
+
+        for line in body_lines:
+            bbox = draw.textbbox((0, 0), line, font=body_font)
+            x = padding  # Left-aligned
             # Shadow
             draw.text((x + 1, y + 1), line, font=body_font, fill="#00000088")
-            draw.text((x, y), line, font=body_font, fill=text_color)
+            draw.text((x, y), line, font=body_font, fill="#ffffff")  # Always white
             y += bbox[3] - bbox[1] + 6
 
-        # ── Place related image ──
-        if related_image:
+        # ── Place related image (below body text) ──
+        # Image zone starts after body text, uses remaining space
+        img_zone_top = max(body_end_y, int(th * 0.48))
+        img_zone_bottom = int(th * 0.88)
+        img_zone_w = tw - (padding * 2)
+        img_zone_h = img_zone_bottom - img_zone_top
+
+        if related_image and img_zone_h > 50:
             try:
                 img = Image.open(io.BytesIO(related_image)).convert("RGBA")
 
@@ -157,17 +161,15 @@ def build_card_pillow(
                 zone_ratio = img_zone_w / img_zone_h
 
                 if img_ratio > zone_ratio:
-                    # Image wider: fit by height, crop width
                     new_h = img_zone_h
                     new_w = int(new_h * img_ratio)
                 else:
-                    # Image taller: fit by width, crop height
                     new_w = img_zone_w
                     new_h = int(new_w / img_ratio)
 
                 img = img.resize((new_w, new_h), Image.LANCZOS)
 
-                # Crop to zone size (center crop)
+                # Center crop
                 cx = (new_w - img_zone_w) // 2
                 cy = (new_h - img_zone_h) // 2
                 img = img.crop((cx, cy, cx + img_zone_w, cy + img_zone_h))
