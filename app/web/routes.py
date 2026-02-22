@@ -316,6 +316,21 @@ async def api_delete_team_member(chat_id: int):
     return JSONResponse(status_code=404, content={"error": "Member not found"})
 
 
+# ── Logs ───────────────────────────────────────────────────────────────
+
+
+@router.get("/api/logs")
+async def api_get_logs(after: int = 0, limit: int = 200):
+    """Get recent log entries for the admin dashboard."""
+    from app.log_handler import get_log_handler
+    handler = get_log_handler()
+    if after > 0:
+        logs, counter = handler.get_logs(after=after, limit=limit)
+    else:
+        logs, counter = handler.get_all(limit=limit)
+    return {"logs": logs, "counter": counter}
+
+
 # ── YouTube OAuth ──────────────────────────────────────────────────────
 
 

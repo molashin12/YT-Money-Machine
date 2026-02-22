@@ -25,6 +25,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+# Install in-memory log handler for admin dashboard
+from app.log_handler import install_log_handler
+install_log_handler()
 logger = logging.getLogger(__name__)
 
 # ── Bot setup ──────────────────────────────────────────────────────────
