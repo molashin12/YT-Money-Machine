@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — YouTube Shorts Generator</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --surface2: #1c1c27;
+            --border: #2a2a3a;
+            --text: #e0e0f0;
+            --text-dim: #8888aa;
+            --accent: #7c3aed;
+            --accent-hover: #8b5cf6;
+            --danger: #ef4444;
+            --danger-hover: #f87171;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--accent-hover);
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .header h1 {
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header nav {
+            display: flex;
+            gap: 12px;
+        }
+
+        .header nav a {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .header nav a:hover {
+            background: var(--surface2);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            background: var(--surface);
+        }
+
+        .tab {
+            padding: 14px 24px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        /* Content */
+        .content {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-header h3 {
+            font-size: 1.1rem;
+        }
+
+        /* Forms */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        input[type="color"] {
+            padding: 4px;
+            height: 42px;
+            cursor: pointer;
+        }
+
+        input[type="file"] {
+            padding: 8px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Channel list */
+        .channel-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--surface2);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .channel-item:hover {
+            border-color: var(--border);
+        }
+
+        .channel-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+
+        .channel-info {
+            flex: 1;
+        }
+
+        .channel-info h4 {
+            font-size: 1rem;
+        }
+
+        .channel-info span {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .channel-badges {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg);
+            color: var(--text-dim);
+        }
+
+        .badge.ok {
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .badge.warn {
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+
+        .channel-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Key list */
+        .key-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: var(--surface2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .key-item span {
+            flex: 1;
+            color: var(--text-dim);
+        }
+
+        .key-add-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .key-add-row input {
+            flex: 1;
+        }
+
+        /* Toggle */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+        }
+
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .toggle.on {
+            background: var(--accent);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s;
+        }
+
+        .toggle.on::after {
+            transform: translateX(22px);
+        }
+
+        /* Music list */
+        .music-item {
+            padding: 10px 14px;
+            background: var(--surface2);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .music-item span {
+            color: var(--text-dim);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            width: 90%;
+            max-width: 550px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            z-index: 200;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: var(--success);
+            color: white;
+        }
+
+        .toast.error {
+            background: var(--danger);
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: var(--text-dim);
+        }
+
+        .empty-state p {
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>⚙️ Admin Dashboard</h1>
+        <nav>
+            <a href="/">← Generator</a>
+        </nav>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="channels">📺 Channels</div>
+        <div class="tab" data-tab="keys">🔑 API Keys</div>
+        <div class="tab" data-tab="cron">⏰ Cron Jobs</div>
+        <div class="tab" data-tab="music">🎵 Music</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+        <!-- ═══ Channels Tab ═══ -->
+        <div class="tab-panel active" id="tab-channels">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Your Channels</h3>
+                    <button class="btn btn-primary" onclick="openAddChannel()">+ Add Channel</button>
+                </div>
+                <div id="channels-list"></div>
+            </div>
+        </div>
+
+        <!-- ═══ API Keys Tab ═══ -->
+        <div class="tab-panel" id="tab-keys">
+            <!-- Gemini -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🤖 Gemini API Keys</h3>
+                </div>
+                <div id="gemini-keys-list"></div>
+                <div class="key-add-row">
+                    <input type="text" id="gemini-new-key" placeholder="Paste Gemini API key...">
+                    <button class="btn btn-primary btn-sm" onclick="addKey('gemini')">Add</button>
+                </div>
+                <div class="toggle-row" style="margin-top: 16px;">
+                    <span>🔄 Cycling (round-robin between keys)</span>
+                    <div class="toggle" id="gemini-cycling" onclick="toggleCycling('gemini')"></div>
+                </div>
+            </div>
+
+            <!-- Pexels -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📷 Pexels API Keys</h3>
+                </div>
+                <div id="pexels-keys-list"></div>
+                <div class="key-add-row">
+                    <input type="text" id="pexels-new-key" placeholder="Paste Pexels API key...">
+                    <button class="btn btn-primary btn-sm" onclick="addKey('pexels')">Add</button>
+                </div>
+                <div class="toggle-row" style="margin-top: 16px;">
+                    <span>🔄 Cycling</span>
+                    <div class="toggle" id="pexels-cycling" onclick="toggleCycling('pexels')"></div>
+                </div>
+            </div>
+
+            <!-- Google CSE -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔍 Google CSE Keys</h3>
+                </div>
+                <div id="google_cse-keys-list"></div>
+                <div class="key-add-row">
+                    <input type="text" id="google_cse-new-key" placeholder="Paste Google CSE API key...">
+                    <button class="btn btn-primary btn-sm" onclick="addKey('google_cse')">Add</button>
+                </div>
+                <div class="toggle-row" style="margin-top: 16px;">
+                    <span>🔄 Cycling</span>
+                    <div class="toggle" id="google_cse-cycling" onclick="toggleCycling('google_cse')"></div>
+                </div>
+                <!-- CSE CX -->
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>Custom Search Engine ID (CX)</label>
+                    <div class="key-add-row">
+                        <input type="text" id="cse-cx-input" placeholder="Custom Search Engine ID...">
+                        <button class="btn btn-primary btn-sm" onclick="saveCseCx()">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telegram Bot Token -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🤖 Telegram Bot Token</h3>
+                </div>
+                <div id="telegram-token-display" style="margin-bottom:12px;"></div>
+                <div class="key-add-row">
+                    <input type="text" id="telegram-token-input" placeholder="Paste Telegram Bot Token...">
+                    <button class="btn btn-primary btn-sm" onclick="saveBotToken()">Save</button>
+                </div>
+                <p style="font-size:0.8rem;color:var(--text-dim);margin-top:8px;">Get a token from <a
+                        href="https://t.me/BotFather" target="_blank">@BotFather</a>. Restart the server after changing.
+                </p>
+            </div>
+
+            <!-- Team Members -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>👥 Team Members</h3>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">
+                    Add team members who can receive cron job ideas via Telegram.
+                    To get your chat ID, send <code>/start</code> to the bot.
+                </p>
+                <div id="team-list"></div>
+                <div class="key-add-row" style="margin-top:12px;">
+                    <input type="text" id="team-name" placeholder="Name (e.g. Mohamed)" style="flex:0.6;">
+                    <input type="text" id="team-chat-id" placeholder="Chat ID" style="flex:0.4;">
+                    <button class="btn btn-primary btn-sm" onclick="addTeamMember()">Add</button>
+                </div>
+            </div>
+
+            <!-- YouTube OAuth -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🎥 YouTube OAuth</h3>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">
+                    Required to upload videos as drafts. Create credentials at
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud
+                        Console</a>.
+                    Set redirect URI to: <code>http://localhost:8000/api/youtube/callback</code>
+                </p>
+                <div id="yt-oauth-status" style="margin-bottom:12px;"></div>
+                <div class="key-add-row">
+                    <input type="text" id="yt-client-id" placeholder="OAuth Client ID" style="flex:1;">
+                    <input type="text" id="yt-client-secret" placeholder="OAuth Client Secret" style="flex:1;">
+                    <button class="btn btn-primary btn-sm" onclick="saveYouTubeOAuth()">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Cron Jobs Tab ═══ -->
+        <div class="tab-panel" id="tab-cron">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Scheduled Idea Generation</h3>
+                    <button class="btn btn-primary" onclick="openAddCron()">+ Add Cron Job</button>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:16px;">
+                    Schedule automatic idea generation for channels. Ideas are sent to Telegram for approval before
+                    video creation.
+                </p>
+                <div id="cron-list"></div>
+            </div>
+        </div>
+
+        <!-- ═══ Music Tab ═══ -->
+        <div class="tab-panel" id="tab-music">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Available Music Files</h3>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px;">
+                    Add music files (MP3, WAV, OGG) to <code>assets/music/</code> folder.
+                </p>
+                <div id="music-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Channel Modal -->
+    <div class="modal-overlay" id="channel-modal">
+        <div class="modal">
+            <h2 id="modal-title">Add Channel</h2>
+            <input type="hidden" id="edit-slug">
+
+            <div class="form-group">
+                <label>Channel Name *</label>
+                <input type="text" id="ch-name" placeholder="e.g. Amazing Facts">
+            </div>
+
+            <div class="form-group">
+                <label>Channel Description / AI Style Guide</label>
+                <textarea id="ch-description" rows="3"
+                    placeholder="Describe the channel's content style. E.g.: 'Educational science facts for kids, use simple language, excited tone, always include a fun comparison'"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Primary Color</label>
+                    <input type="color" id="ch-primary" value="#1a1a2e">
+                </div>
+                <div class="form-group">
+                    <label>Accent Color</label>
+                    <input type="color" id="ch-accent" value="#e94560">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Card Builder Mode</label>
+                <select id="ch-card-mode">
+                    <option value="pillow">🖼️ Pillow (Free, fast)</option>
+                    <option value="ai">🤖 AI Gemini (Better quality, costs tokens)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Text Color</label>
+                <input type="color" id="ch-text-color" value="#ffffff">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Sound Mode</label>
+                    <select id="ch-sound-mode">
+                        <option value="random">🎲 Random</option>
+                        <option value="none">🔇 No Sound</option>
+                        <option value="specific">🎵 Specific Track</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Video Duration (seconds)</label>
+                    <input type="number" id="ch-duration" value="5" min="3" max="60">
+                </div>
+            </div>
+
+            <div class="form-group" id="sound-file-group" style="display:none;">
+                <label>Sound File (filename in assets/music/)</label>
+                <select id="ch-sound-file"></select>
+            </div>
+
+            <div class="form-group">
+                <label>Card Template (PNG)</label>
+                <input type="file" id="ch-template" accept="image/png,image/jpeg,image/webp">
+            </div>
+
+            <div class="form-group">
+                <label>Logo (PNG)</label>
+                <input type="file" id="ch-logo" accept="image/png,image/jpeg,image/webp">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveChannel()">Save Channel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Cron Job Modal -->
+    <div class="modal-overlay" id="cron-modal">
+        <div class="modal">
+            <h2>Add Cron Job</h2>
+            <div class="form-group">
+                <label>Channel *</label>
+                <select id="cron-channel"></select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Number of Ideas</label>
+                    <input type="number" id="cron-count" value="10" min="1" max="30">
+                </div>
+                <div class="form-group">
+                    <label>Time (Cairo TZ)</label>
+                    <input type="time" id="cron-time" value="09:00">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Assign To *</label>
+                <select id="cron-member"></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeCronModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveCronJob()">Create Job</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ── Tab switching ──
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ── Toast ──
+        function toast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + type + ' show';
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // ── Channels ──
+        async function loadChannels() {
+            const res = await fetch('/api/channels');
+            const channels = await res.json();
+            const list = document.getElementById('channels-list');
+
+            if (channels.length === 0) {
+                list.innerHTML = '<div class="empty-state"><h3>No channels yet</h3><p>Create your first channel to get started.</p></div>';
+                return;
+            }
+
+            list.innerHTML = channels.map(ch => `
+                <div class="channel-item">
+                    <div class="channel-color" style="background:${ch.accent_color}"></div>
+                    <div class="channel-info">
+                        <h4>${ch.name}</h4>
+                        <span>${ch.slug} · ${ch.video_duration || 5}s · ${ch.sound_mode || 'random'} · ${ch.card_mode === 'ai' ? '🤖 AI' : '🖼️ Pillow'}</span>
+                        <div class="channel-badges">
+                            <span class="badge ${ch.has_template ? 'ok' : 'warn'}">${ch.has_template ? '✓ Template' : '⚠ No Template'}</span>
+                            <span class="badge ${ch.has_logo ? 'ok' : ''}">${ch.has_logo ? '✓ Logo' : 'No Logo'}</span>
+                            <span class="badge" id="yt-badge-${ch.slug}">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="channel-actions">
+                        <button class="btn btn-outline btn-sm" onclick="connectYouTube('${ch.slug}')">🔗 YouTube</button>
+                        <button class="btn btn-outline btn-sm" onclick="editChannel('${ch.slug}')">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.slug}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Refresh YouTube connection status badges
+            channels.forEach(async ch => {
+                try {
+                    const ytRes = await fetch(`/api/youtube/status/${ch.slug}`);
+                    const yt = await ytRes.json();
+                    const badge = document.getElementById(`yt-badge-${ch.slug}`);
+                    if (badge) {
+                        badge.className = `badge ${yt.connected ? 'ok' : 'warn'}`;
+                        badge.textContent = yt.connected ? '✓ YouTube' : '⚠ No YouTube';
+                    }
+                } catch (e) { }
+            });
+        }
+
+        function openAddChannel() {
+            document.getElementById('modal-title').textContent = 'Add Channel';
+            document.getElementById('edit-slug').value = '';
+            document.getElementById('ch-name').value = '';
+            document.getElementById('ch-description').value = '';
+            document.getElementById('ch-primary').value = '#1a1a2e';
+            document.getElementById('ch-accent').value = '#e94560';
+            document.getElementById('ch-card-mode').value = 'pillow';
+            document.getElementById('ch-text-color').value = '#ffffff';
+            document.getElementById('ch-sound-mode').value = 'random';
+            document.getElementById('ch-duration').value = '5';
+            document.getElementById('ch-template').value = '';
+            document.getElementById('ch-logo').value = '';
+            document.getElementById('channel-modal').classList.add('show');
+            loadMusicForSelect();
+        }
+
+        async function editChannel(slug) {
+            const res = await fetch('/api/channels');
+            const channels = await res.json();
+            const ch = channels.find(c => c.slug === slug);
+            if (!ch) return;
+
+            document.getElementById('modal-title').textContent = 'Edit Channel';
+            document.getElementById('edit-slug').value = slug;
+            document.getElementById('ch-name').value = ch.name;
+            document.getElementById('ch-description').value = ch.description || '';
+            document.getElementById('ch-primary').value = ch.primary_color;
+            document.getElementById('ch-accent').value = ch.accent_color;
+            document.getElementById('ch-card-mode').value = ch.card_mode || 'pillow';
+            document.getElementById('ch-text-color').value = ch.text_color;
+            document.getElementById('ch-sound-mode').value = ch.sound_mode || 'random';
+            document.getElementById('ch-duration').value = ch.video_duration || 5;
+            document.getElementById('ch-template').value = '';
+            document.getElementById('ch-logo').value = '';
+            document.getElementById('channel-modal').classList.add('show');
+            loadMusicForSelect(ch.sound_file);
+            toggleSoundFile();
+        }
+
+        function closeModal() {
+            document.getElementById('channel-modal').classList.remove('show');
+        }
+
+        async function saveChannel() {
+            const slug = document.getElementById('edit-slug').value;
+            const data = {
+                name: document.getElementById('ch-name').value,
+                description: document.getElementById('ch-description').value,
+                primary_color: document.getElementById('ch-primary').value,
+                accent_color: document.getElementById('ch-accent').value,
+                card_mode: document.getElementById('ch-card-mode').value,
+                text_color: document.getElementById('ch-text-color').value,
+                sound_mode: document.getElementById('ch-sound-mode').value,
+                sound_file: document.getElementById('ch-sound-file').value || null,
+                video_duration: parseInt(document.getElementById('ch-duration').value) || 5,
+            };
+
+            if (!data.name) { toast('Channel name is required', 'error'); return; }
+
+            try {
+                let savedSlug;
+                if (slug) {
+                    const res = await fetch(`/api/channels/${slug}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data),
+                    });
+                    const result = await res.json();
+                    savedSlug = result.slug || slug;
+                } else {
+                    const res = await fetch('/api/channels', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data),
+                    });
+                    const result = await res.json();
+                    savedSlug = result.slug;
+                }
+
+                // Upload template
+                const templateFile = document.getElementById('ch-template').files[0];
+                if (templateFile) {
+                    const fd = new FormData();
+                    fd.append('file', templateFile);
+                    await fetch(`/api/channels/${savedSlug}/template`, { method: 'POST', body: fd });
+                }
+
+                // Upload logo
+                const logoFile = document.getElementById('ch-logo').files[0];
+                if (logoFile) {
+                    const fd = new FormData();
+                    fd.append('file', logoFile);
+                    await fetch(`/api/channels/${savedSlug}/logo`, { method: 'POST', body: fd });
+                }
+
+                toast(slug ? 'Channel updated!' : 'Channel created!');
+                closeModal();
+                loadChannels();
+            } catch (e) {
+                toast('Failed: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteChannel(slug) {
+            if (!confirm(`Delete channel "${slug}"?`)) return;
+            await fetch(`/api/channels/${slug}`, { method: 'DELETE' });
+            toast('Channel deleted');
+            loadChannels();
+        }
+
+        // Sound mode toggle
+        document.getElementById('ch-sound-mode').addEventListener('change', toggleSoundFile);
+        function toggleSoundFile() {
+            const mode = document.getElementById('ch-sound-mode').value;
+            document.getElementById('sound-file-group').style.display = mode === 'specific' ? 'block' : 'none';
+        }
+
+        async function loadMusicForSelect(selected = null) {
+            const res = await fetch('/api/music');
+            const files = await res.json();
+            const sel = document.getElementById('ch-sound-file');
+            sel.innerHTML = '<option value="">-- Select --</option>' +
+                files.map(f => `<option value="${f}" ${f === selected ? 'selected' : ''}>${f}</option>`).join('');
+        }
+
+        // ── API Keys ──
+        async function loadKeys() {
+            const res = await fetch('/api/keys');
+            const data = await res.json();
+
+            ['gemini', 'pexels', 'google_cse'].forEach(service => {
+                const svc = data[service] || { keys: [], cycling: false };
+                const list = document.getElementById(`${service}-keys-list`);
+
+                if (svc.keys.length === 0) {
+                    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:8px 0;">No keys added</div>';
+                } else {
+                    list.innerHTML = svc.keys.map((k, i) => `
+                        <div class="key-item">
+                            <span>${k}</span>
+                            <button class="btn btn-danger btn-sm" onclick="deleteKey('${service}', ${i})">✕</button>
+                        </div>
+                    `).join('');
+                }
+
+                const toggle = document.getElementById(`${service}-cycling`);
+                toggle.classList.toggle('on', svc.cycling);
+            });
+
+            // CSE CX
+            document.getElementById('cse-cx-input').value = data.google_cse_cx || '';
+
+            // Bot token
+            const tokenDisplay = document.getElementById('telegram-token-display');
+            if (data.telegram_bot_token) {
+                tokenDisplay.innerHTML = `<div class="key-item"><span>${data.telegram_bot_token}</span></div>`;
+            } else {
+                tokenDisplay.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:8px 0;">No token set</div>';
+            }
+        }
+
+        async function addKey(service) {
+            const input = document.getElementById(`${service}-new-key`);
+            const key = input.value.trim();
+            if (!key) { toast('Enter a key', 'error'); return; }
+
+            await fetch(`/api/keys/${service}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key }),
+            });
+            input.value = '';
+            toast('Key added!');
+            loadKeys();
+        }
+
+        async function deleteKey(service, index) {
+            if (!confirm('Remove this key?')) return;
+            await fetch(`/api/keys/${service}/${index}`, { method: 'DELETE' });
+            toast('Key removed');
+            loadKeys();
+        }
+
+        async function toggleCycling(service) {
+            const toggle = document.getElementById(`${service}-cycling`);
+            const enabled = !toggle.classList.contains('on');
+            await fetch(`/api/keys/${service}/cycling`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled }),
+            });
+            toggle.classList.toggle('on', enabled);
+            toast(`Cycling ${enabled ? 'enabled' : 'disabled'} for ${service}`);
+        }
+
+        async function saveCseCx() {
+            const key = document.getElementById('cse-cx-input').value.trim();
+            await fetch('/api/keys/google_cse_cx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key }),
+            });
+            toast('CSE ID saved!');
+        }
+
+        async function saveBotToken() {
+            const key = document.getElementById('telegram-token-input').value.trim();
+            if (!key) { toast('Enter a token', 'error'); return; }
+            await fetch('/api/keys/telegram_bot_token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key }),
+            });
+            document.getElementById('telegram-token-input').value = '';
+            toast('Bot token saved! Restart the server to apply.');
+            loadKeys();
+        }
+
+        // ── Music ──
+        async function loadMusic() {
+            const res = await fetch('/api/music');
+            const files = await res.json();
+            const list = document.getElementById('music-list');
+
+            if (files.length === 0) {
+                list.innerHTML = '<div class="empty-state"><h3>No music files</h3><p>Add MP3/WAV/OGG files to assets/music/</p></div>';
+            } else {
+                list.innerHTML = files.map(f => `
+                    <div class="music-item">🎵 ${f}</div>
+                `).join('');
+            }
+        }
+
+        // ── Team Members ──
+        let _teamMembers = [];
+
+        async function loadTeamMembers() {
+            const res = await fetch('/api/team');
+            _teamMembers = await res.json();
+            const list = document.getElementById('team-list');
+
+            if (_teamMembers.length === 0) {
+                list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:8px 0;">No team members</div>';
+            } else {
+                list.innerHTML = _teamMembers.map(m => `
+                    <div class="key-item">
+                        <span style="color:var(--text);flex:1;">👤 ${m.name}</span>
+                        <span style="flex:0.5;">${m.chat_id}</span>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTeamMember(${m.chat_id})">✕</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function addTeamMember() {
+            const name = document.getElementById('team-name').value.trim();
+            const chatId = document.getElementById('team-chat-id').value.trim();
+            if (!name || !chatId) { toast('Name and chat ID are required', 'error'); return; }
+
+            await fetch('/api/team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, chat_id: parseInt(chatId) }),
+            });
+            document.getElementById('team-name').value = '';
+            document.getElementById('team-chat-id').value = '';
+            toast(`${name} added to team!`);
+            loadTeamMembers();
+        }
+
+        async function deleteTeamMember(chatId) {
+            if (!confirm('Remove this team member?')) return;
+            await fetch(`/api/team/${chatId}`, { method: 'DELETE' });
+            toast('Team member removed');
+            loadTeamMembers();
+        }
+
+        function _getMemberName(chatId) {
+            const m = _teamMembers.find(m => m.chat_id === chatId);
+            return m ? m.name : chatId;
+        }
+
+        // ── Cron Jobs ──
+        async function loadCronJobs() {
+            const res = await fetch('/api/cron');
+            const jobs = await res.json();
+            const list = document.getElementById('cron-list');
+
+            if (jobs.length === 0) {
+                list.innerHTML = '<div class="empty-state"><h3>No cron jobs</h3><p>Create one to schedule automatic idea generation.</p></div>';
+                return;
+            }
+
+            list.innerHTML = jobs.map(job => `
+                <div class="channel-item">
+                    <div class="channel-color" style="background:${job.enabled ? 'var(--success)' : 'var(--border)'}"></div>
+                    <div class="channel-info">
+                        <h4>${job.channel_slug}</h4>
+                        <span>${job.num_ideas} ideas · ${job.schedule_time} (Cairo) · 👤 ${_getMemberName(job.telegram_chat_id)}</span>
+                        <div class="channel-badges">
+                            <span class="badge ${job.enabled ? 'ok' : ''}">${job.enabled ? '✓ Active' : 'Disabled'}</span>
+                        </div>
+                    </div>
+                    <div class="channel-actions">
+                        <button class="btn btn-outline btn-sm" onclick="triggerCron('${job.id}')">▶ Test</button>
+                        <button class="btn btn-outline btn-sm" onclick="toggleCron('${job.id}', ${!job.enabled})">${job.enabled ? '⏸ Disable' : '▶ Enable'}</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteCron('${job.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function openAddCron() {
+            // Populate channel dropdown
+            const chRes = await fetch('/api/channels');
+            const channels = await chRes.json();
+            document.getElementById('cron-channel').innerHTML =
+                channels.map(ch => `<option value="${ch.slug}">${ch.name}</option>`).join('');
+
+            // Populate team member dropdown
+            const memberSel = document.getElementById('cron-member');
+            if (_teamMembers.length === 0) {
+                memberSel.innerHTML = '<option value="">-- Add team members first --</option>';
+            } else {
+                memberSel.innerHTML = _teamMembers.map(m =>
+                    `<option value="${m.chat_id}">👤 ${m.name}</option>`
+                ).join('');
+            }
+
+            document.getElementById('cron-count').value = '10';
+            document.getElementById('cron-time').value = '09:00';
+            document.getElementById('cron-modal').classList.add('show');
+        }
+
+        function closeCronModal() {
+            document.getElementById('cron-modal').classList.remove('show');
+        }
+
+        async function saveCronJob() {
+            const memberChatId = document.getElementById('cron-member').value;
+            const data = {
+                channel_slug: document.getElementById('cron-channel').value,
+                num_ideas: parseInt(document.getElementById('cron-count').value) || 10,
+                schedule_time: document.getElementById('cron-time').value,
+                timezone: 'Africa/Cairo',
+                telegram_chat_id: parseInt(memberChatId) || null,
+                enabled: true,
+            };
+
+            if (!data.channel_slug) { toast('Select a channel', 'error'); return; }
+            if (!data.telegram_chat_id) { toast('Add a team member first', 'error'); return; }
+
+            await fetch('/api/cron', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            toast('Cron job created!');
+            closeCronModal();
+            loadCronJobs();
+        }
+
+        async function deleteCron(id) {
+            if (!confirm('Delete this cron job?')) return;
+            await fetch(`/api/cron/${id}`, { method: 'DELETE' });
+            toast('Cron job deleted');
+            loadCronJobs();
+        }
+
+        async function toggleCron(id, enabled) {
+            await fetch(`/api/cron/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled }),
+            });
+            toast(enabled ? 'Cron job enabled' : 'Cron job disabled');
+            loadCronJobs();
+        }
+
+        async function triggerCron(id) {
+            const res = await fetch(`/api/cron/${id}/trigger`, { method: 'POST' });
+            const data = await res.json();
+            toast(data.message || 'Triggered! Check Telegram.');
+        }
+
+        // ── YouTube OAuth ──
+        async function loadYouTubeOAuth() {
+            try {
+                const res = await fetch('/api/youtube/config');
+                const data = await res.json();
+                const status = document.getElementById('yt-oauth-status');
+                if (data.configured) {
+                    status.innerHTML = '<span class="badge ok">✓ OAuth Configured</span>';
+                } else {
+                    status.innerHTML = '<span class="badge warn">⚠ Not Configured</span>';
+                }
+            } catch (e) { }
+        }
+
+        async function saveYouTubeOAuth() {
+            const clientId = document.getElementById('yt-client-id').value.trim();
+            const clientSecret = document.getElementById('yt-client-secret').value.trim();
+            if (!clientId || !clientSecret) { toast('Both fields required', 'error'); return; }
+
+            await fetch('/api/youtube/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+            });
+            document.getElementById('yt-client-id').value = '';
+            document.getElementById('yt-client-secret').value = '';
+            toast('YouTube OAuth credentials saved!');
+            loadYouTubeOAuth();
+        }
+
+        function connectYouTube(slug) {
+            window.open(`/api/youtube/auth/${slug}`, '_blank', 'width=600,height=700');
+        }
+
+        // ── Init ──
+        loadChannels();
+        loadKeys();
+        loadTeamMembers().then(() => loadCronJobs());
+        loadMusic();
+        loadYouTubeOAuth();
+    </script>
+</body>
+
+</html>

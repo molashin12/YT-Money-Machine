@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+output/
+assets/backgrounds/
+.venv/
+venv/

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Shorts Generator</title>
+    <meta name="description"
+        content="AI-powered YouTube Shorts video generator — turn facts, images, and social media links into branded short videos.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-secondary: #12122a;
+            --bg-card: #1a1a3e;
+            --bg-input: #0f0f2e;
+            --accent: #6c5ce7;
+            --accent-glow: rgba(108, 92, 231, 0.3);
+            --accent-light: #a29bfe;
+            --text-primary: #f0f0ff;
+            --text-secondary: #8888aa;
+            --border: #2a2a5e;
+            --success: #00cec9;
+            --error: #ff6b6b;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Ambient background glow */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 20%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(0, 206, 201, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 580px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Header ─────────────────────────────────── */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-light), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ── Card ───────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(108, 92, 231, 0.05);
+            backdrop-filter: blur(12px);
+        }
+
+        /* ── Form elements ──────────────────────────── */
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        select,
+        textarea,
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 15px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+
+        select:focus,
+        textarea:focus,
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            line-height: 1.5;
+        }
+
+        /* ── Dropzone ───────────────────────────────── */
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag-over {
+            border-color: var(--accent);
+            background: rgba(108, 92, 231, 0.05);
+        }
+
+        .dropzone-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+
+        .dropzone-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .dropzone-text strong {
+            color: var(--accent-light);
+        }
+
+        .dropzone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-preview {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            margin-top: 12px;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .file-preview.visible {
+            display: flex;
+        }
+
+        .file-preview .name {
+            flex: 1;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-preview .remove {
+            color: var(--error);
+            cursor: pointer;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .file-preview .remove:hover {
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        /* ── Divider ────────────────────────────────── */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 8px 0 24px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── Button ─────────────────────────────────── */
+        .btn-generate {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent), #7c5ce7);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-generate::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.1));
+            pointer-events: none;
+        }
+
+        .btn-generate:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-glow);
+        }
+
+        .btn-generate:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-generate:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── Progress ───────────────────────────────── */
+        .progress-section {
+            display: none;
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .progress-section.visible {
+            display: block;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .progress-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* ── Result ─────────────────────────────────── */
+        .result-section {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .result-section.visible {
+            display: block;
+        }
+
+        .result-section video {
+            width: 100%;
+            max-height: 400px;
+            border-radius: 12px;
+            background: #000;
+            margin-bottom: 16px;
+        }
+
+        .yt-metadata {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .yt-metadata h3 {
+            font-size: 14px;
+            color: var(--accent-light);
+            margin-bottom: 14px;
+        }
+
+        .yt-field {
+            margin-bottom: 12px;
+        }
+
+        .yt-field label {
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .yt-field-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .yt-field-value span {
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+
+        .btn-copy {
+            padding: 4px 10px;
+            background: rgba(108, 92, 231, 0.2);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            color: var(--accent-light);
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        .btn-copy:hover {
+            background: rgba(108, 92, 231, 0.4);
+        }
+
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--success), #00b894);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 206, 201, 0.3);
+        }
+
+        /* ── Error ──────────────────────────────────── */
+        .error-msg {
+            display: none;
+            margin-top: 16px;
+            padding: 14px 18px;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            border-radius: 10px;
+            color: var(--error);
+            font-size: 14px;
+        }
+
+        .error-msg.visible {
+            display: block;
+        }
+
+        /* ── Responsive ─────────────────────────────── */
+        @media (max-width: 480px) {
+            .card {
+                padding: 24px 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>⚡ YouTube Shorts Generator</h1>
+            <p>Turn facts, images, and social media links into branded short videos</p>
+            <p style="margin-top:8px;"><a href="/admin" style="color:var(--accent-light);font-size:13px;">⚙️ Admin
+                    Dashboard</a></p>
+        </div>
+
+        <div class="card">
+            <form id="genForm" enctype="multipart/form-data">
+                <!-- Channel Selection -->
+                <div class="form-group">
+                    <label for="channel">Channel</label>
+                    <select id="channel" name="channel" required>
+                        {% for ch in channels %}
+                        <option value="{{ ch.slug }}">📺 {{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Text / URL Input -->
+                <div class="form-group">
+                    <label for="text">Text or URL</label>
+                    <textarea id="text" name="text"
+                        placeholder="Paste a TikTok, Instagram, or YouTube link&#10;— or type a fact / piece of information..."></textarea>
+                </div>
+
+                <div class="divider">or upload an image</div>
+
+                <!-- Image Upload -->
+                <div class="form-group">
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-icon">🖼️</div>
+                        <div class="dropzone-text">
+                            Drag &amp; drop an image, or <strong>click to browse</strong>
+                        </div>
+                        <input type="file" id="imageInput" name="image" accept="image/*">
+                    </div>
+                    <div class="file-preview" id="filePreview">
+                        <span>📎</span>
+                        <span class="name" id="fileName"></span>
+                        <span class="remove" id="removeFile">✕</span>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate" id="generateBtn">
+                    🎬 Generate Video
+                </button>
+            </form>
+
+            <!-- Progress -->
+            <div class="progress-section" id="progressSection">
+                <div class="spinner"></div>
+                <div class="progress-text" id="progressText">Starting video generation...</div>
+            </div>
+
+            <!-- Error -->
+            <div class="error-msg" id="errorMsg"></div>
+
+            <!-- Result -->
+            <div class="result-section" id="resultSection">
+                <video id="resultVideo" controls></video>
+                <a class="btn-download" id="downloadBtn" download="youtube_short.mp4">
+                    ⬇️ Download Video
+                </a>
+                <div class="yt-metadata" id="ytMetadata">
+                    <h3>📋 YouTube Metadata</h3>
+                    <div class="yt-field">
+                        <label>VIDEO TITLE</label>
+                        <div class="yt-field-value">
+                            <span id="ytTitle"></span>
+                            <button class="btn-copy" onclick="copyText('ytTitle')">Copy</button>
+                        </div>
+                    </div>
+                    <div class="yt-field">
+                        <label>DESCRIPTION</label>
+                        <div class="yt-field-value">
+                            <span id="ytDescription"></span>
+                            <button class="btn-copy" onclick="copyText('ytDescription')">Copy</button>
+                        </div>
+                    </div>
+                    <div class="yt-field">
+                        <label>HASHTAGS</label>
+                        <div class="yt-field-value">
+                            <span id="ytHashtags"></span>
+                            <button class="btn-copy" onclick="copyText('ytHashtags')">Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('genForm');
+        const imageInput = document.getElementById('imageInput');
+        const dropzone = document.getElementById('dropzone');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const removeFile = document.getElementById('removeFile');
+        const generateBtn = document.getElementById('generateBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressText = document.getElementById('progressText');
+        const errorMsg = document.getElementById('errorMsg');
+        const resultSection = document.getElementById('resultSection');
+        const resultVideo = document.getElementById('resultVideo');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Dropzone events
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('drag-over');
+        });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                showFilePreview(e.dataTransfer.files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', () => {
+            if (imageInput.files.length) showFilePreview(imageInput.files[0]);
+        });
+
+        removeFile.addEventListener('click', () => {
+            imageInput.value = '';
+            filePreview.classList.remove('visible');
+        });
+
+        function showFilePreview(file) {
+            fileName.textContent = file.name;
+            filePreview.classList.add('visible');
+        }
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const text = document.getElementById('text').value.trim();
+            const hasImage = imageInput.files.length > 0;
+
+            if (!text && !hasImage) {
+                showError('Please provide text, a URL, or an image.');
+                return;
+            }
+
+            // Reset UI
+            hideError();
+            resultSection.classList.remove('visible');
+            progressSection.classList.add('visible');
+            generateBtn.disabled = true;
+            progressText.textContent = '🚀 Starting video generation... This may take up to a minute.';
+
+            try {
+                const formData = new FormData(form);
+
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Generation failed');
+                }
+
+                resultVideo.src = data.video_url;
+                downloadBtn.href = data.video_url;
+
+                // Show YT metadata
+                document.getElementById('ytTitle').textContent = data.yt_title || '';
+                document.getElementById('ytDescription').textContent = data.yt_description || '';
+                document.getElementById('ytHashtags').textContent = (data.yt_hashtags || []).join(' ');
+
+                resultSection.classList.add('visible');
+                progressSection.classList.remove('visible');
+
+            } catch (err) {
+                progressSection.classList.remove('visible');
+                showError(err.message);
+            } finally {
+                generateBtn.disabled = false;
+            }
+        });
+
+        function copyText(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector(`#${elementId}`).parentElement.querySelector('.btn-copy');
+                btn.textContent = '✓';
+                setTimeout(() => btn.textContent = 'Copy', 1500);
+            });
+        }
+
+        function showError(msg) {
+            errorMsg.textContent = '❌ ' + msg;
+            errorMsg.classList.add('visible');
+        }
+
+        function hideError() {
+            errorMsg.classList.remove('visible');
+        }
+    </script>
+
+</body>
+
+</html>
