@@ -142,6 +142,16 @@ async def api_upload_template(slug: str, file: UploadFile = File(...)):
     return {"ok": True, "path": path}
 
 
+@router.post("/api/channels/{slug}/svg-template")
+async def api_upload_svg_template(slug: str, file: UploadFile = File(...)):
+    """Upload an SVG card template for a channel."""
+    if not settings_store.get_channel(slug):
+        return JSONResponse(status_code=404, content={"error": "Channel not found"})
+    svg_bytes = await file.read()
+    path = settings_store.save_channel_svg_template(slug, svg_bytes)
+    return {"ok": True, "path": path}
+
+
 @router.post("/api/channels/{slug}/logo")
 async def api_upload_logo(slug: str, file: UploadFile = File(...)):
     """Upload a logo for a channel."""

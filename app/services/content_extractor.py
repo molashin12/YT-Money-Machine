@@ -36,7 +36,7 @@ If there's text in the image, read and use it. If in another language, translate
 {additional_context}
 
 Return ONLY JSON:
-{{"title":"Short catchy headline (3-6 words)","body":"A detailed, engaging retelling of the fact in 5-8 sentences (400-600 characters). Write it like a compelling social media post — start with a hook, build the story with vivid details, and end with a punchy conclusion.","keywords":["keyword1","keyword2","keyword3","keyword4","keyword5"],"image_search_query":"Best 3-5 word search to find a PHOTO of the main subject (use person names, place names, or specific objects)","yt_title":"Catchy YouTube Shorts title (max 70 chars, include emoji)","yt_description":"Brief YouTube description (2-3 sentences, include call to action)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}
+{{"title":"Short catchy headline (3-6 words)","body":"A punchy, tweet-style fact in exactly 40-50 characters. Must be a complete thought — concise but not too short.","keywords":["keyword1","keyword2","keyword3","keyword4","keyword5"],"image_search_query":"Best 3-5 word search to find a PHOTO of the main subject (use person names, place names, or specific objects)","yt_title":"Catchy YouTube Shorts title (max 70 chars, include emoji)","yt_description":"Brief YouTube description (2-3 sentences, include call to action)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}
 
 KEYWORD RULES: If about a PERSON, first keyword = their full name. If about a PLACE, include the place name. Keywords must be specific and searchable."""
 

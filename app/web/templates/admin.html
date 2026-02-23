@@ -768,6 +768,7 @@
                 <select id="ch-card-mode">
                     <option value="pillow">🖼️ Pillow (Free, fast)</option>
                     <option value="ai">🤖 AI Gemini (Better quality, costs tokens)</option>
+                    <option value="svg">📐 SVG Template (Figma export)</option>
                 </select>
             </div>
 
@@ -799,6 +800,12 @@
             <div class="form-group">
                 <label>Card Template (PNG)</label>
                 <input type="file" id="ch-template" accept="image/png,image/jpeg,image/webp">
+            </div>
+
+            <div class="form-group">
+                <label>SVG Template (Figma export)</label>
+                <input type="file" id="ch-svg-template" accept="image/svg+xml,.svg">
+                <small style="color:#888">Export from Figma with id="input_text", id="main_image", id="source"</small>
             </div>
 
             <div class="form-group">
@@ -943,6 +950,7 @@
             document.getElementById('ch-sound-mode').value = ch.sound_mode || 'random';
             document.getElementById('ch-duration').value = ch.video_duration || 5;
             document.getElementById('ch-template').value = '';
+            document.getElementById('ch-svg-template').value = '';
             document.getElementById('ch-logo').value = '';
             document.getElementById('channel-modal').classList.add('show');
             loadMusicForSelect(ch.sound_file);
@@ -995,6 +1003,14 @@
                     const fd = new FormData();
                     fd.append('file', templateFile);
                     await fetch(`/api/channels/${savedSlug}/template`, { method: 'POST', body: fd });
+                }
+
+                // Upload SVG template
+                const svgFile = document.getElementById('ch-svg-template').files[0];
+                if (svgFile) {
+                    const fd = new FormData();
+                    fd.append('file', svgFile);
+                    await fetch(`/api/channels/${savedSlug}/svg-template`, { method: 'POST', body: fd });
                 }
 
                 // Upload logo

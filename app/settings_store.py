@@ -216,6 +216,15 @@ def save_channel_template(slug: str, image_bytes: bytes) -> str:
     return str(template_path)
 
 
+def save_channel_svg_template(slug: str, svg_bytes: bytes) -> str:
+    """Save an SVG template for a channel. Returns the file path."""
+    ch_dir = CHANNELS_DIR / slug
+    ch_dir.mkdir(parents=True, exist_ok=True)
+    svg_path = ch_dir / "template.svg"
+    svg_path.write_bytes(svg_bytes)
+    return str(svg_path)
+
+
 def save_channel_logo(slug: str, image_bytes: bytes) -> str:
     """Save a logo image for a channel. Returns the file path."""
     ch_dir = CHANNELS_DIR / slug

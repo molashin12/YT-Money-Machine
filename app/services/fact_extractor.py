@@ -34,7 +34,7 @@ Given the following raw content, extract the SINGLE most interesting, surprising
 Format your response as JSON with these exact keys:
 {{
   "title": "Short catchy headline (3-6 words, no period)",
-  "body": "A detailed, engaging retelling of the fact in 5-8 sentences (400-600 characters). Write it like a compelling social media post — start with a hook, build the story with vivid details, and end with a punchy conclusion. Make readers want to share it.",
+  "body": "A punchy, tweet-style fact in exactly 40-50 characters. Must be a complete thought — concise but not too short.",
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "image_search_query": "A single search query (3-5 words) to find a PHOTO directly related to this fact",
   "yt_title": "A catchy YouTube Shorts video title (max 70 chars, include an emoji)",
