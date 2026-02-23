@@ -43,6 +43,9 @@ DEFAULT_IMAGE_HEIGHT = 300      # Fallback image height
 MIN_CARD_WIDTH = 350            # Minimum card width
 MAX_CARD_WIDTH = 800            # Maximum card width
 SIDE_PADDING = 24               # Padding on left/right of content
+MAX_TEXT_LINES = 5              # Maximum text lines before shrinking font
+MIN_FONT_SIZE = 14              # Minimum font size (px)
+MAX_IMAGE_HEIGHT_RATIO = 0.6    # Image can use at most 60% of card height
 
 # SVG / XML namespaces
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -140,11 +143,37 @@ def _read_tspan_coords(text_el: ET.Element) -> tuple[float, float]:
 
 # ── Core injection functions ──────────────────────────────────────────
 
-def _inject_text(root: ET.Element, body: str, svg_width: float) -> dict:
+def _compute_text_layout(
+    body: str, svg_width: float, text_x: float, font_size: float,
+) -> dict:
+    """
+    Dry-run text layout: compute how many lines and how much height
+    the text would need at the given font size and card width.
+    Does NOT modify the SVG — used for planning.
+    """
+    available_w = svg_width - (text_x * 2)
+    chars_per_line = max(10, int(available_w / (font_size * 0.55)))
+    line_height = font_size * 1.35
+    lines = _wrap_text(body, chars_per_line)
+    text_height = len(lines) * line_height
+    return {
+        "num_lines": len(lines),
+        "text_height": text_height,
+        "line_height": line_height,
+        "chars_per_line": chars_per_line,
+        "font_size": font_size,
+    }
+
+
+def _inject_text(
+    root: ET.Element, body: str, svg_width: float,
+    font_size_override: float = 0,
+) -> dict:
     """
     Replace the content of id="input_text" with word-wrapped <tspan> elements.
 
-    Handles Figma exports where x/y live on <tspan> children, not the <text>.
+    If font_size_override > 0, use it instead of the template's font size.
+    This allows the orchestrator to shrink text dynamically.
 
     Returns a dict with:
       x, start_y  — the original position of the text element
@@ -166,16 +195,27 @@ def _inject_text(root: ET.Element, body: str, svg_width: float) -> dict:
         style = el.get("style", "")
         m = re.search(r"font-size:\s*(\d+)", style)
         font_size_str = m.group(1) if m else "22"
-    font_size = float(font_size_str.replace("px", "").strip()) if font_size_str else 22
+    template_font = float(font_size_str.replace("px", "").strip()) if font_size_str else 22
+
+    # Use override if provided
+    font_size = font_size_override if font_size_override > 0 else template_font
 
     # Calculate chars per line based on the available width and font size
     available_w = svg_width - (orig_x * 2)  # symmetric padding
     # Approximate: each char ≈ 0.55 × font_size wide
-    chars_per_line = max(15, int(available_w / (font_size * 0.55)))
+    chars_per_line = max(10, int(available_w / (font_size * 0.55)))
     line_height = font_size * 1.35  # reasonable line-height
 
     logger.info(f"SVG text: x={orig_x}, y={orig_y}, font={font_size}px, "
                 f"available_w={available_w}, chars/line={chars_per_line}")
+
+    # Apply the font size to the element
+    el.set("font-size", str(font_size))
+    # Also update style attribute if it has font-size
+    style = el.get("style", "")
+    if "font-size" in style:
+        style = re.sub(r"font-size:\s*\d+(\.\d+)?px?", f"font-size:{font_size}px", style)
+        el.set("style", style)
 
     # Clear all existing content
     el.text = None
@@ -204,6 +244,7 @@ def _inject_text(root: ET.Element, body: str, svg_width: float) -> dict:
         "text_height": text_height,
         "num_lines": len(lines),
         "line_height": line_height,
+        "font_size": font_size,
     }
 
 
@@ -520,20 +561,21 @@ def _inject_source(root: ET.Element, source_text: str, new_y: float, x: float = 
 
 
 def _resize_svg(root: ET.Element, svg_width: float, new_height: float) -> None:
-    """Update SVG root height, viewBox, and any background <rect>."""
+    """Update SVG root width, height, viewBox, and any background <rect>."""
     root.set("width", str(int(svg_width)))
     root.set("height", str(int(new_height)))
     root.set("viewBox", f"0 0 {int(svg_width)} {int(new_height)}")
 
-    # Expand background rect(s) — typically the first <rect> with full width
+    # Expand background rect(s) to match the new dimensions
     for rect in root.iter(f"{{{SVG_NS}}}rect"):
         rw = _get_float(rect, "width", 0)
-        if rw >= svg_width * 0.9:
-            # Only expand the background rect (top-level, no pattern fill)
+        # Background rect is typically the widest non-pattern rect
+        if rw >= svg_width * 0.8:
             fill = rect.get("fill", "")
             if not fill.startswith("url("):
+                rect.set("width", str(int(svg_width)))
                 rect.set("height", str(int(new_height)))
-                logger.info(f"Background rect height → {int(new_height)}")
+                logger.info(f"Background rect → {int(svg_width)}×{int(new_height)}")
                 break
 
 
@@ -549,10 +591,14 @@ async def build_card_svg(
     """
     Build a card by injecting content into the channel's SVG template.
 
-    The card dynamically sizes to fit content:
-    - Image area expands to show the full image (no cropping)
-    - Width adapts based on image proportions (clamped to min/max)
-    - Height grows to fit text + image + source
+    Two-pass dynamic layout:
+    Pass 1: Compute optimal font size and card width to fit text (text is ALWAYS prioritized)
+    Pass 2: Inject content with the computed parameters
+
+    The card adapts to content:
+    - Text is NEVER cut off — font size shrinks and/or card widens to fit
+    - Image area shows the full image proportionally (no cropping)
+    - Card width and height are both dynamic
 
     Returns PNG bytes on a 1080×1920 transparent canvas, or None on failure.
     """
@@ -573,13 +619,83 @@ async def build_card_svg(
 
     svg_w, original_h = _svg_dims(root)
 
-    # ── 1. Inject text ──
-    text_info = _inject_text(root, body, svg_w)
+    # ═════════════════════════════════════════════════════════════════════
+    # PASS 1: Determine optimal font size and card width so text fits
+    # ═════════════════════════════════════════════════════════════════════
+
+    # Read the template's original text position and font size
+    text_el = _find_by_id(root, "input_text")
+    text_x = SIDE_PADDING
+    template_font = 22.0
+    if text_el is not None:
+        text_x, _ = _read_tspan_coords(text_el)
+        fs = text_el.get("font-size", "")
+        if not fs:
+            style = text_el.get("style", "")
+            m = re.search(r"font-size:\s*(\d+)", style)
+            fs = m.group(1) if m else "22"
+        template_font = float(fs.replace("px", "").strip()) if fs else 22.0
+
+    # Try progressively: first widen card, then shrink font
+    best_font = template_font
+    best_width = svg_w
+
+    # Strategy: try widening the card first (keeps text readable),
+    # then shrink font as last resort
+    widths_to_try = [svg_w]
+    # Add wider options
+    for w in [svg_w * 1.2, svg_w * 1.4, svg_w * 1.6]:
+        if w <= MAX_CARD_WIDTH:
+            widths_to_try.append(w)
+    if MAX_CARD_WIDTH not in widths_to_try:
+        widths_to_try.append(MAX_CARD_WIDTH)
+
+    found_fit = False
+    for try_width in widths_to_try:
+        layout = _compute_text_layout(body, try_width, text_x, template_font)
+        if layout["num_lines"] <= MAX_TEXT_LINES:
+            best_width = try_width
+            best_font = template_font
+            found_fit = True
+            logger.info(f"Text fits at width={try_width:.0f}, font={template_font}px, "
+                        f"lines={layout['num_lines']}")
+            break
+
+    # If widening alone doesn't help, shrink the font
+    if not found_fit:
+        best_width = MAX_CARD_WIDTH
+        for try_font in range(int(template_font) - 1, int(MIN_FONT_SIZE) - 1, -1):
+            layout = _compute_text_layout(body, best_width, text_x, float(try_font))
+            if layout["num_lines"] <= MAX_TEXT_LINES:
+                best_font = float(try_font)
+                found_fit = True
+                logger.info(f"Text fits at width={best_width:.0f}, font={best_font}px, "
+                            f"lines={layout['num_lines']}")
+                break
+
+    if not found_fit:
+        # Ultimate fallback: use min font at max width
+        best_font = MIN_FONT_SIZE
+        best_width = MAX_CARD_WIDTH
+        logger.warning(f"Text still long — using min font {MIN_FONT_SIZE}px at max width")
+
+    # Ensure minimum width
+    best_width = max(best_width, MIN_CARD_WIDTH)
+
+    logger.info(f"Dynamic layout decided: width={best_width:.0f}, font={best_font}px "
+                f"(template: {svg_w:.0f}w, {template_font}px)")
+
+    # ═════════════════════════════════════════════════════════════════════
+    # PASS 2: Inject content with the computed parameters
+    # ═════════════════════════════════════════════════════════════════════
+
+    # ── 1. Inject text with the optimal font size ──
+    text_info = _inject_text(root, body, best_width, font_size_override=best_font)
     text_bottom = text_info["start_y"] + text_info["text_height"]
 
     # ── 2. Inject image ──
     image_y = text_bottom + TEXT_TO_IMAGE_GAP
-    img_info = _inject_image(root, related_image, image_y, svg_w)
+    img_info = _inject_image(root, related_image, image_y, best_width)
     image_bottom = img_info["img_y"] + img_info["img_height"]
 
     # ── 3. Inject source ──
@@ -587,28 +703,11 @@ async def build_card_svg(
     source_y = image_bottom + IMAGE_TO_SOURCE_GAP
     _inject_source(root, source_text, source_y, x=text_info["x"])
 
-    # ── 4. Compute dynamic dimensions ──
+    # ── 4. Compute final dimensions ──
     new_height = source_y + BOTTOM_PADDING + 10
     new_height = max(new_height, original_h)
 
-    # Dynamic width: if the image has a wide natural aspect, widen the card
-    final_w = svg_w
-    # Only widen if the image's natural proportions suggest it
-    if related_image and img_info.get("natural_width", 0) > 0:
-        try:
-            pil = Image.open(io.BytesIO(related_image))
-            img_aspect = pil.width / pil.height
-            # If image is very wide (landscape), widen the card
-            if img_aspect > 1.2:
-                # Content area = card width minus padding
-                content_w = img_info["img_width"]
-                desired_w = content_w + (SIDE_PADDING * 2)
-                final_w = max(svg_w, min(desired_w, MAX_CARD_WIDTH))
-                final_w = max(final_w, MIN_CARD_WIDTH)
-        except Exception:
-            pass
-
-    _resize_svg(root, final_w, new_height)
+    _resize_svg(root, best_width, new_height)
 
     # ── 5. Render → PNG ──
     try:
@@ -617,10 +716,10 @@ async def build_card_svg(
         svg_str = ET.tostring(root, encoding="unicode", xml_declaration=True)
         png_data = cairosvg.svg2png(
             bytestring=svg_str.encode("utf-8"),
-            output_width=int(final_w),
+            output_width=int(best_width),
             output_height=int(new_height),
         )
-        logger.info(f"SVG → PNG: {len(png_data)} bytes, {int(final_w)}×{int(new_height)}")
+        logger.info(f"SVG → PNG: {len(png_data)} bytes, {int(best_width)}×{int(new_height)}")
     except Exception as e:
         logger.exception(f"CairoSVG render failed: {e}")
         return None
