@@ -45,12 +45,13 @@ class ChannelConfig:
     accent_color: str = "#e94560"
     text_color: str = "#ffffff"
     description: str = ""  # Channel style guide for AI
-    card_mode: str = "pillow"  # "pillow" or "ai"
+    card_mode: str = "pillow"  # "pillow", "ai", or "svg"
     sound_mode: str = "random"  # "random", "none", "specific"
     sound_file: Optional[str] = None
     video_duration: int = 5
     logo_path: Optional[str] = None
     template_path: Optional[str] = None
+    svg_template_path: Optional[str] = None
 
     def __post_init__(self):
         channel_dir = CHANNELS_DIR / self.slug
@@ -58,10 +59,14 @@ class ChannelConfig:
         logo = channel_dir / "logo.png"
         if logo.exists():
             self.logo_path = str(logo)
-        # Auto-resolve card template
+        # Auto-resolve card template (PNG)
         template = channel_dir / "template.png"
         if template.exists():
             self.template_path = str(template)
+        # Auto-resolve SVG template
+        svg_template = channel_dir / "template.svg"
+        if svg_template.exists():
+            self.svg_template_path = str(svg_template)
 
 
 def load_channels() -> list[ChannelConfig]:

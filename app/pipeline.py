@@ -140,6 +140,16 @@ async def generate_video(
                 related_image=related_image_bytes,
                 image_source=image_source,
             )
+        elif card_mode == "svg":
+            await _progress("🎨 Rendering SVG card template...")
+            from app.services.card_builder_svg import build_card_svg
+            card_bytes = await build_card_svg(
+                channel=channel,
+                title=fact.title,
+                body=fact.body,
+                related_image=related_image_bytes,
+                image_source=image_source,
+            )
         else:
             await _progress("🎨 Building card with Pillow...")
             from app.services.card_builder_pillow import build_card_pillow
