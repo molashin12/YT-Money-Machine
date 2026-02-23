@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="800" viewBox="0 0 400 800">
-  <rect width="400" height="800" fill="#1a1a2e" rx="16"/>
-  <text id="input_text" x="20" y="80" fill="white" font-family="Inter, sans-serif" font-size="22">Placeholder text</text>
-  <image id="main_image" x="20" y="300" width="360" height="300" href=""/>
-  <text id="source" x="20" y="650" fill="#888888" font-family="Inter, sans-serif" font-size="14">source: web</text>
-</svg>
