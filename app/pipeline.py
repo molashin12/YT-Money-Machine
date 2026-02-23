@@ -118,7 +118,12 @@ async def generate_video(
 
         # ── Step 3: Search/generate related image ──────────────────────
         await _progress("🔍 Finding a related image...")
-        image_result = await search_image(fact.keywords)
+        # Prefer the AI-generated search query, fall back to keywords
+        search_terms = (
+            fact.image_search_query.split() if fact.image_search_query
+            else fact.keywords
+        )
+        image_result = await search_image(search_terms)
         related_image_bytes = image_result.image_bytes if image_result else None
         image_source = image_result.source if image_result else ""
 
