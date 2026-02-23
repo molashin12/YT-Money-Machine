@@ -43,7 +43,7 @@ DEFAULT_IMAGE_HEIGHT = 300      # Fallback image height
 MIN_CARD_WIDTH = 350            # Minimum card width
 MAX_CARD_WIDTH = 800            # Maximum card width
 SIDE_PADDING = 24               # Padding on left/right of content
-MAX_TEXT_LINES = 5              # Maximum text lines before shrinking font
+MAX_TEXT_LINES = 10              # Maximum text lines before shrinking font
 MIN_FONT_SIZE = 14              # Minimum font size (px)
 MAX_IMAGE_HEIGHT_RATIO = 0.6    # Image can use at most 60% of card height
 
@@ -649,51 +649,28 @@ async def build_card_svg(
             fs = m.group(1) if m else "22"
         template_font = float(fs.replace("px", "").strip()) if fs else 22.0
 
-    # Try progressively: first widen card, then shrink font
+    # Strategy: Keep original template width (vertical video friendly).
+    # Allow text to wrap into more lines (grow height, not width).
+    # Only shrink font if text would exceed MAX_TEXT_LINES.
     best_font = template_font
-    best_width = svg_w
+    best_width = svg_w  # keep original width
 
-    # Strategy: try widening the card first (keeps text readable),
-    # then shrink font as last resort
-    widths_to_try = [svg_w]
-    # Add wider options
-    for w in [svg_w * 1.2, svg_w * 1.4, svg_w * 1.6]:
-        if w <= MAX_CARD_WIDTH:
-            widths_to_try.append(w)
-    if MAX_CARD_WIDTH not in widths_to_try:
-        widths_to_try.append(MAX_CARD_WIDTH)
-
-    found_fit = False
-    for try_width in widths_to_try:
-        layout = _compute_text_layout(body, try_width, text_x, template_font)
-        if layout["num_lines"] <= MAX_TEXT_LINES:
-            best_width = try_width
-            best_font = template_font
-            found_fit = True
-            logger.info(f"Text fits at width={try_width:.0f}, font={template_font}px, "
-                        f"lines={layout['num_lines']}")
-            break
-
-    # If widening alone doesn't help, shrink the font
-    if not found_fit:
-        best_width = MAX_CARD_WIDTH
+    layout = _compute_text_layout(body, svg_w, text_x, template_font)
+    if layout["num_lines"] <= MAX_TEXT_LINES:
+        logger.info(f"Text fits at template size: {layout['num_lines']} lines, "
+                    f"font={template_font}px")
+    else:
+        # Only shrink font if too many lines at original width
         for try_font in range(int(template_font) - 1, int(MIN_FONT_SIZE) - 1, -1):
-            layout = _compute_text_layout(body, best_width, text_x, float(try_font))
+            layout = _compute_text_layout(body, svg_w, text_x, float(try_font))
             if layout["num_lines"] <= MAX_TEXT_LINES:
                 best_font = float(try_font)
-                found_fit = True
-                logger.info(f"Text fits at width={best_width:.0f}, font={best_font}px, "
-                            f"lines={layout['num_lines']}")
+                logger.info(f"Text fits with smaller font: {layout['num_lines']} lines, "
+                            f"font={best_font}px")
                 break
-
-    if not found_fit:
-        # Ultimate fallback: use min font at max width
-        best_font = MIN_FONT_SIZE
-        best_width = MAX_CARD_WIDTH
-        logger.warning(f"Text still long — using min font {MIN_FONT_SIZE}px at max width")
-
-    # Ensure minimum width
-    best_width = max(best_width, MIN_CARD_WIDTH)
+        else:
+            best_font = MIN_FONT_SIZE
+            logger.warning(f"Text still long — using min font {MIN_FONT_SIZE}px")
 
     logger.info(f"Dynamic layout decided: width={best_width:.0f}, font={best_font}px "
                 f"(template: {svg_w:.0f}w, {template_font}px)")

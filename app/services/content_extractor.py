@@ -35,9 +35,9 @@ If there's text in the image, read and use it. If in another language, translate
 {additional_context}
 
 Return ONLY JSON:
-{{"title":"Short catchy headline (3-6 words)","body":"The main fact text — MUST be between 40 and 50 words long. Count carefully.","keywords":["keyword1","keyword2","keyword3","keyword4","keyword5"],"image_search_query":"Best 3-5 word search to find a PHOTO of the main subject (use person names, place names, or specific objects)","yt_title":"Catchy YouTube Shorts title (max 70 chars, include emoji)","yt_description":"Brief YouTube description (2-3 sentences, include call to action)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}
+{{"title":"Short catchy headline (3-6 words)","body":"The main fact text — MUST be between 25 and 35 words long. Count carefully.","keywords":["keyword1","keyword2","keyword3","keyword4","keyword5"],"image_search_query":"Best 3-5 word search to find a PHOTO of the main subject (use person names, place names, or specific objects)","yt_title":"Catchy YouTube Shorts title (max 70 chars, include emoji)","yt_description":"Brief YouTube description (2-3 sentences, include call to action)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}
 
-CRITICAL: The "body" MUST be between 40 and 50 words. Count every word carefully. If too long, shorten it. If too short, add descriptive details.
+CRITICAL: The "body" MUST be between 25 and 35 words. Count every word carefully. If too long, shorten it. If too short, add descriptive details.
 
 KEYWORD RULES: If about a PERSON, first keyword = their full name. If about a PLACE, include the place name. Keywords must be specific and searchable."""
 

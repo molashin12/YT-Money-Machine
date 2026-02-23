@@ -34,7 +34,7 @@ Given the following raw content, extract the SINGLE most interesting, surprising
 Format your response as JSON with these exact keys:
 {{
   "title": "Short catchy headline (3-6 words, no period)",
-  "body": "The main fact text. MUST be between 40 and 50 words long (including spaces). Count carefully before answering.",
+  "body": "The main fact text. MUST be between 25 and 35 words long (including spaces). Count carefully before answering.",
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "image_search_query": "A single search query (3-5 words) to find a PHOTO directly related to this fact",
   "yt_title": "A catchy YouTube Shorts video title (max 70 chars, include an emoji)",
@@ -43,11 +43,11 @@ Format your response as JSON with these exact keys:
 }}
 
 CRITICAL — BODY WORD COUNT RULES:
-- The "body" field MUST be between 40 and 50 words (including spaces)
+- The "body" field MUST be between 25 and 35 words (including spaces)
 - Count every word carefully
 - If the fact is too long, shorten it. If too short, add descriptive details
 - Example of 45 chars: "Honey never spoils, even after 3000 years!!"
-- NEVER produce body text shorter than 40 words or longer than 50 words
+- NEVER produce body text shorter than 25 words or longer than 35 words
 
 KEYWORD RULES (very important for finding the right image):
 - If the fact is about a PERSON, the first keyword MUST be their full name
@@ -70,7 +70,7 @@ Raw content:
 """
 
 
-def _enforce_body_length(body: str, min_words: int = 10, max_words: int = 50) -> str:
+def _enforce_body_length(body: str, min_words: int = 10, max_words: int = 35) -> str:
     """Ensure body text is within the target word count range."""
     body = body.strip()
     words = body.split()
