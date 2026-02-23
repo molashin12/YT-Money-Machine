@@ -560,17 +560,23 @@ def _inject_source(root: ET.Element, source_text: str, new_y: float, x: float = 
     logger.info(f"SVG source: '{source_text}' at x={x}, y={new_y}")
 
 
-def _resize_svg(root: ET.Element, svg_width: float, new_height: float) -> None:
-    """Update SVG root width, height, viewBox, and any background <rect>."""
+def _resize_svg(root: ET.Element, svg_width: float, new_height: float, original_width: float = 0) -> None:
+    """Update SVG root width, height, viewBox, and any background <rect>.
+
+    original_width: The ORIGINAL template width used to find the background rect.
+    """
     root.set("width", str(int(svg_width)))
     root.set("height", str(int(new_height)))
     root.set("viewBox", f"0 0 {int(svg_width)} {int(new_height)}")
+
+    # Use original width to detect background rect (it has not been resized yet)
+    detect_w = original_width if original_width > 0 else svg_width
 
     # Expand background rect(s) to match the new dimensions
     for rect in root.iter(f"{{{SVG_NS}}}rect"):
         rw = _get_float(rect, "width", 0)
         # Background rect is typically the widest non-pattern rect
-        if rw >= svg_width * 0.8:
+        if rw >= detect_w * 0.8:
             fill = rect.get("fill", "")
             if not fill.startswith("url("):
                 rect.set("width", str(int(svg_width)))
@@ -707,7 +713,7 @@ async def build_card_svg(
     new_height = source_y + BOTTOM_PADDING + 10
     new_height = max(new_height, original_h)
 
-    _resize_svg(root, best_width, new_height)
+    _resize_svg(root, best_width, new_height, original_width=svg_w)
 
     # ── 5. Render → PNG ──
     try:
