@@ -25,9 +25,9 @@ AVOID these topics that were already covered:
 {past_topics}
 
 Return ONLY a JSON array:
-[{{"title":"Short headline (3-6 words)","body":"The main fact — MUST be between 40 and 50 characters (including spaces). Count carefully.","keywords":["visual_kw1","visual_kw2","visual_kw3"],"yt_title":"YouTube Shorts title (max 70 chars, emoji)","yt_description":"Brief description (2-3 sentences)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}]
+[{{"title":"Short headline (3-6 words)","body":"The main fact — MUST be between 40 and 50 words long. Count carefully.","keywords":["visual_kw1","visual_kw2","visual_kw3"],"yt_title":"YouTube Shorts title (max 70 chars, emoji)","yt_description":"Brief description (2-3 sentences)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}]
 
-CRITICAL: Each "body" MUST be between 40 and 50 characters. Count every letter, space, and punctuation. Example of 45 chars: "Honey never spoils, even after 3000 years!!"
+CRITICAL: Each "body" MUST be between 40 and 50 words. Count every word carefully. If too long, shorten it. If too short, add descriptive details.
 
 Rules:
 - Every idea must be UNIQUE and different from the past topics

@@ -44,10 +44,10 @@ Format your response as JSON with these exact keys:
 
 CRITICAL — BODY WORD COUNT RULES:
 - The "body" field MUST be between 40 and 50 words (including spaces)
-- Count every letter, space, and punctuation mark
+- Count every word carefully
 - If the fact is too long, shorten it. If too short, add descriptive details
 - Example of 45 chars: "Honey never spoils, even after 3000 years!!"
-- NEVER produce body text shorter than 40 chars or longer than 50 chars
+- NEVER produce body text shorter than 40 words or longer than 50 words
 
 KEYWORD RULES (very important for finding the right image):
 - If the fact is about a PERSON, the first keyword MUST be their full name
@@ -70,16 +70,14 @@ Raw content:
 """
 
 
-def _enforce_body_length(body: str, min_len: int = 14, max_len: int = 50) -> str:
-    """Ensure body text is within the target character range."""
+def _enforce_body_length(body: str, min_words: int = 10, max_words: int = 50) -> str:
+    """Ensure body text is within the target word count range."""
     body = body.strip()
-    if len(body) <= max_len:
+    words = body.split()
+    if len(words) <= max_words:
         return body
-    # Truncate at word boundary
-    truncated = body[:max_len]
-    last_space = truncated.rfind(" ")
-    if last_space > min_len:
-        truncated = truncated[:last_space]
+    # Truncate to max_words
+    truncated = " ".join(words[:max_words])
     # Remove trailing punctuation that looks incomplete
     truncated = truncated.rstrip(",;: ")
     return truncated
