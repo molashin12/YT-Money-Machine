@@ -560,29 +560,36 @@ def _inject_source(root: ET.Element, source_text: str, new_y: float, x: float = 
     logger.info(f"SVG source: '{source_text}' at x={x}, y={new_y}")
 
 
-def _resize_svg(root: ET.Element, svg_width: float, new_height: float, original_width: float = 0) -> None:
-    """Update SVG root width, height, viewBox, and any background <rect>.
-
-    original_width: The ORIGINAL template width used to find the background rect.
-    """
+def _resize_svg(root, svg_width, new_height, original_width=0):
+    """Update SVG dimensions and expand ALL background rects to cover full card."""
+    SVG_NS = "http://www.w3.org/2000/svg"
     root.set("width", str(int(svg_width)))
     root.set("height", str(int(new_height)))
     root.set("viewBox", f"0 0 {int(svg_width)} {int(new_height)}")
 
-    # Use original width to detect background rect (it has not been resized yet)
-    detect_w = original_width if original_width > 0 else svg_width
-
-    # Expand background rect(s) to match the new dimensions
+    # Find and expand background rects.
+    # Strategy: any rect whose fill is NOT a pattern URL is a candidate.
+    # The background rect is typically the one with the largest area.
+    best_rect = None
+    best_area = 0
     for rect in root.iter(f"{{{SVG_NS}}}rect"):
-        rw = _get_float(rect, "width", 0)
-        # Background rect is typically the widest non-pattern rect
-        if rw >= detect_w * 0.8:
-            fill = rect.get("fill", "")
-            if not fill.startswith("url("):
-                rect.set("width", str(int(svg_width)))
-                rect.set("height", str(int(new_height)))
-                logger.info(f"Background rect → {int(svg_width)}×{int(new_height)}")
-                break
+        fill = rect.get("fill", "")
+        if fill.startswith("url("):
+            continue  # skip image pattern rects
+        try:
+            rw = float(rect.get("width", "0").replace("px", ""))
+            rh = float(rect.get("height", "0").replace("px", ""))
+        except ValueError:
+            continue
+        area = rw * rh
+        if area > best_area:
+            best_area = area
+            best_rect = rect
+
+    if best_rect is not None:
+        best_rect.set("width", str(int(svg_width)))
+        best_rect.set("height", str(int(new_height)))
+        logger.info(f"Background rect -> {int(svg_width)}x{int(new_height)}")
 
 
 # ── Main entry point ──────────────────────────────────────────────────
