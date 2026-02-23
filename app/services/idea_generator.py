@@ -10,7 +10,7 @@ from typing import Optional
 from google.genai import types as genai_types
 
 from app.services.api_key_manager import get_key_manager
-from app.services.fact_extractor import ExtractedFact, _enforce_body_length
+from app.services.fact_extractor import ExtractedFact
 from app.services.video_history import get_past_titles
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ async def generate_ideas(
         for item in ideas_data[:count]:
             ideas.append(ExtractedFact(
                 title=item.get("title", ""),
-                body=_enforce_body_length(item.get("body", "")),
+                body=item.get("body", ""),
                 keywords=item.get("keywords", []),
                 yt_title=item.get("yt_title", ""),
                 yt_description=item.get("yt_description", ""),

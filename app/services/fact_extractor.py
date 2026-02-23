@@ -138,7 +138,7 @@ async def extract_facts(raw_content: str, channel_description: str = "") -> Extr
 
         return ExtractedFact(
             title=data.get("title", "Did You Know?"),
-            body=_enforce_body_length(data.get("body", raw_content[:200])),
+            body=data.get("body", raw_content[:200]),
             keywords=data.get("keywords", ["interesting", "facts"]),
             image_search_query=data.get("image_search_query", ""),
             yt_title=data.get("yt_title", ""),

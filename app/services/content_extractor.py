@@ -16,7 +16,7 @@ from typing import Optional
 from google.genai import types as genai_types
 
 from app.services.api_key_manager import get_key_manager
-from app.services.fact_extractor import ExtractedFact, _enforce_body_length
+from app.services.fact_extractor import ExtractedFact
 
 logger = logging.getLogger(__name__)
 
@@ -428,7 +428,7 @@ async def _merged_analyze_and_extract(
 
         return ExtractedFact(
             title=data.get("title", "Did You Know?"),
-            body=_enforce_body_length(data.get("body", "")),
+            body=data.get("body", ""),
             keywords=data.get("keywords", ["interesting", "facts"]),
             image_search_query=data.get("image_search_query", ""),
             yt_title=data.get("yt_title", ""),
