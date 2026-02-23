@@ -71,15 +71,34 @@ Raw content:
 
 
 def _enforce_body_length(body: str, min_words: int = 10, max_words: int = 35) -> str:
-    """Ensure body text is within the target word count range."""
+    """Ensure body text is within the target word count range.
+    
+    Truncates at the last sentence boundary (. ! ?) within the word limit
+    to avoid incomplete thoughts like 'as long as'.
+    """
     body = body.strip()
     words = body.split()
     if len(words) <= max_words:
         return body
-    # Truncate to max_words
+    # Truncate to max_words first
     truncated = " ".join(words[:max_words])
-    # Remove trailing punctuation that looks incomplete
-    truncated = truncated.rstrip(",;: ")
+    # Try to find the last sentence-ending punctuation
+    # Look for the last '.', '!', or '?' in the truncated text
+    last_period = max(truncated.rfind(". "), truncated.rfind("! "), truncated.rfind("? "))
+    # Also check if the text ends with sentence punctuation
+    if truncated.endswith((".", "!", "?")):
+        return truncated
+    if last_period > 0:
+        # Cut at the last complete sentence
+        result = truncated[:last_period + 1]
+        # Only use this if the result is at least min_words long
+        if len(result.split()) >= min_words:
+            return result
+    # No good sentence boundary found — just truncate cleanly
+    truncated = truncated.rstrip(",;:— ")
+    # Add period if it doesn't end with one
+    if not truncated.endswith((".", "!", "?")):
+        truncated += "."
     return truncated
 
 
