@@ -40,6 +40,9 @@ TEXT_TO_IMAGE_GAP = 20          # Gap between last text line and image
 IMAGE_TO_SOURCE_GAP = 16        # Gap between image bottom and source text
 BOTTOM_PADDING = 24             # Space below source text
 DEFAULT_IMAGE_HEIGHT = 300      # Fallback image height
+MIN_CARD_WIDTH = 350            # Minimum card width
+MAX_CARD_WIDTH = 800            # Maximum card width
+SIDE_PADDING = 24               # Padding on left/right of content
 
 # SVG / XML namespaces
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -263,14 +266,30 @@ def _inject_image_figma_group(
     if rect_el is None:
         logger.warning("No <rect> found inside main_image <g>")
         return {"img_width": svg_width * 0.9, "img_height": DEFAULT_IMAGE_HEIGHT,
-                "img_x": svg_width * 0.05, "img_y": new_y}
+                "img_x": svg_width * 0.05, "img_y": new_y, "natural_width": svg_width * 0.9}
 
     # Read the rect's original dimensions
     img_x = _get_float(rect_el, "x", svg_width * 0.05)
     img_w = _get_float(rect_el, "width", svg_width * 0.9)
     img_h = _get_float(rect_el, "height", DEFAULT_IMAGE_HEIGHT)
+    natural_w = img_w  # track what width the image naturally wants
 
     if image_bytes:
+        # Get actual image dimensions for proportional sizing
+        try:
+            pil = Image.open(io.BytesIO(image_bytes))
+            actual_w, actual_h = pil.width, pil.height
+            aspect = actual_w / actual_h
+            # Compute proportional height to show full image at rect width
+            img_h = img_w / aspect
+            # Track what width the image would need at its natural aspect
+            natural_w = actual_w
+        except Exception:
+            pass
+
+        # Update rect height to match proportional image
+        rect_el.set("height", str(img_h))
+
         # Extract the pattern ID from fill="url(#patternId)"
         fill_attr = rect_el.get("fill", "")
         pattern_match = re.search(r"url\(#([^)]+)\)", fill_attr)
@@ -287,7 +306,8 @@ def _inject_image_figma_group(
     rect_el.set("y", str(new_y))
 
     logger.info(f"SVG image (Figma group): x={img_x}, y={new_y}, w={img_w}, h={img_h:.0f}")
-    return {"img_width": img_w, "img_height": img_h, "img_x": img_x, "img_y": new_y}
+    return {"img_width": img_w, "img_height": img_h, "img_x": img_x, "img_y": new_y,
+            "natural_width": natural_w}
 
 
 def _replace_pattern_image(
@@ -421,7 +441,7 @@ def _convert_group_to_image(
     img.set("height", str(height))
     img.set("href", data_uri)
     img.set(f"{{{XLINK_NS}}}href", data_uri)
-    img.set("preserveAspectRatio", "xMidYMid slice")
+    img.set("preserveAspectRatio", "xMidYMid meet")
     if float(rx) > 0:
         # Clip to rounded rect via clip-path would be needed, but skip for simplicity
         pass
@@ -440,6 +460,7 @@ def _inject_image_simple(
     img_x = _get_float(el, "x", svg_width * 0.05)
     img_w = _get_float(el, "width", svg_width * 0.9)
     img_h = _get_float(el, "height", DEFAULT_IMAGE_HEIGHT)
+    natural_w = img_w
 
     if image_bytes:
         data_uri = _to_base64_uri(image_bytes)
@@ -451,18 +472,20 @@ def _inject_image_simple(
             pil = Image.open(io.BytesIO(image_bytes))
             aspect = pil.width / pil.height
             img_h = img_w / aspect
+            natural_w = pil.width
         except Exception:
             pass
 
         el.set("width", str(img_w))
         el.set("height", str(img_h))
-        el.set("preserveAspectRatio", "xMidYMid slice")
+        el.set("preserveAspectRatio", "xMidYMid meet")
 
     # Move to new Y position
     el.set("y", str(new_y))
 
     logger.info(f"SVG image (simple): x={img_x}, y={new_y}, w={img_w}, h={img_h:.0f}")
-    return {"img_width": img_w, "img_height": img_h, "img_x": img_x, "img_y": new_y}
+    return {"img_width": img_w, "img_height": img_h, "img_x": img_x, "img_y": new_y,
+            "natural_width": natural_w}
 
 
 def _inject_source(root: ET.Element, source_text: str, new_y: float, x: float = None) -> None:
@@ -526,6 +549,11 @@ async def build_card_svg(
     """
     Build a card by injecting content into the channel's SVG template.
 
+    The card dynamically sizes to fit content:
+    - Image area expands to show the full image (no cropping)
+    - Width adapts based on image proportions (clamped to min/max)
+    - Height grows to fit text + image + source
+
     Returns PNG bytes on a 1080×1920 transparent canvas, or None on failure.
     """
     logger.info(f"Building SVG card for channel: {channel.name}")
@@ -559,10 +587,28 @@ async def build_card_svg(
     source_y = image_bottom + IMAGE_TO_SOURCE_GAP
     _inject_source(root, source_text, source_y, x=text_info["x"])
 
-    # ── 4. Resize SVG ──
+    # ── 4. Compute dynamic dimensions ──
     new_height = source_y + BOTTOM_PADDING + 10
     new_height = max(new_height, original_h)
-    _resize_svg(root, svg_w, new_height)
+
+    # Dynamic width: if the image has a wide natural aspect, widen the card
+    final_w = svg_w
+    # Only widen if the image's natural proportions suggest it
+    if related_image and img_info.get("natural_width", 0) > 0:
+        try:
+            pil = Image.open(io.BytesIO(related_image))
+            img_aspect = pil.width / pil.height
+            # If image is very wide (landscape), widen the card
+            if img_aspect > 1.2:
+                # Content area = card width minus padding
+                content_w = img_info["img_width"]
+                desired_w = content_w + (SIDE_PADDING * 2)
+                final_w = max(svg_w, min(desired_w, MAX_CARD_WIDTH))
+                final_w = max(final_w, MIN_CARD_WIDTH)
+        except Exception:
+            pass
+
+    _resize_svg(root, final_w, new_height)
 
     # ── 5. Render → PNG ──
     try:
@@ -571,10 +617,10 @@ async def build_card_svg(
         svg_str = ET.tostring(root, encoding="unicode", xml_declaration=True)
         png_data = cairosvg.svg2png(
             bytestring=svg_str.encode("utf-8"),
-            output_width=int(svg_w),
+            output_width=int(final_w),
             output_height=int(new_height),
         )
-        logger.info(f"SVG → PNG: {len(png_data)} bytes, {int(svg_w)}×{int(new_height)}")
+        logger.info(f"SVG → PNG: {len(png_data)} bytes, {int(final_w)}×{int(new_height)}")
     except Exception as e:
         logger.exception(f"CairoSVG render failed: {e}")
         return None

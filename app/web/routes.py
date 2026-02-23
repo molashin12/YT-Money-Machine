@@ -100,6 +100,7 @@ async def api_list_channels():
         slug = ch.get("slug", "")
         ch_dir = settings_store.CHANNELS_DIR / slug
         ch["has_template"] = (ch_dir / "template.png").exists()
+        ch["has_svg_template"] = (ch_dir / "template.svg").exists()
         ch["has_logo"] = (ch_dir / "logo.png").exists()
     return channels
 

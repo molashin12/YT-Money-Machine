@@ -34,13 +34,20 @@ Given the following raw content, extract the SINGLE most interesting, surprising
 Format your response as JSON with these exact keys:
 {{
   "title": "Short catchy headline (3-6 words, no period)",
-  "body": "A punchy, tweet-style fact in exactly 40-50 characters. Must be a complete thought — concise but not too short.",
+  "body": "The main fact text. MUST be between 40 and 50 characters long (including spaces). Count carefully before answering.",
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "image_search_query": "A single search query (3-5 words) to find a PHOTO directly related to this fact",
   "yt_title": "A catchy YouTube Shorts video title (max 70 chars, include an emoji)",
   "yt_description": "A brief YouTube description (2-3 sentences, engaging, include a call to action like 'Follow for more!')",
   "yt_hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"]
 }}
+
+CRITICAL — BODY CHARACTER COUNT RULES:
+- The "body" field MUST be between 40 and 50 characters (including spaces)
+- Count every letter, space, and punctuation mark
+- If the fact is too long, shorten it. If too short, add descriptive details
+- Example of 45 chars: "Honey never spoils, even after 3000 years!!"
+- NEVER produce body text shorter than 40 chars or longer than 50 chars
 
 KEYWORD RULES (very important for finding the right image):
 - If the fact is about a PERSON, the first keyword MUST be their full name
@@ -61,6 +68,21 @@ Rules:
 
 Raw content:
 """
+
+
+def _enforce_body_length(body: str, min_len: int = 14, max_len: int = 50) -> str:
+    """Ensure body text is within the target character range."""
+    body = body.strip()
+    if len(body) <= max_len:
+        return body
+    # Truncate at word boundary
+    truncated = body[:max_len]
+    last_space = truncated.rfind(" ")
+    if last_space > min_len:
+        truncated = truncated[:last_space]
+    # Remove trailing punctuation that looks incomplete
+    truncated = truncated.rstrip(",;: ")
+    return truncated
 
 
 async def extract_facts(raw_content: str, channel_description: str = "") -> ExtractedFact:
@@ -99,7 +121,7 @@ async def extract_facts(raw_content: str, channel_description: str = "") -> Extr
 
         return ExtractedFact(
             title=data.get("title", "Did You Know?"),
-            body=data.get("body", raw_content[:200]),
+            body=_enforce_body_length(data.get("body", raw_content[:200])),
             keywords=data.get("keywords", ["interesting", "facts"]),
             image_search_query=data.get("image_search_query", ""),
             yt_title=data.get("yt_title", ""),

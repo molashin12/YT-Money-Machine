@@ -10,7 +10,7 @@ from typing import Optional
 from google.genai import types as genai_types
 
 from app.services.api_key_manager import get_key_manager
-from app.services.fact_extractor import ExtractedFact
+from app.services.fact_extractor import ExtractedFact, _enforce_body_length
 from app.services.video_history import get_past_titles
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,9 @@ AVOID these topics that were already covered:
 {past_topics}
 
 Return ONLY a JSON array:
-[{{"title":"Short headline (3-6 words)","body":"Fact in 1-3 sentences, max 200 chars","keywords":["visual_kw1","visual_kw2","visual_kw3"],"yt_title":"YouTube Shorts title (max 70 chars, emoji)","yt_description":"Brief description (2-3 sentences)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}]
+[{{"title":"Short headline (3-6 words)","body":"The main fact — MUST be between 40 and 50 characters (including spaces). Count carefully.","keywords":["visual_kw1","visual_kw2","visual_kw3"],"yt_title":"YouTube Shorts title (max 70 chars, emoji)","yt_description":"Brief description (2-3 sentences)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}]
+
+CRITICAL: Each "body" MUST be between 40 and 50 characters. Count every letter, space, and punctuation. Example of 45 chars: "Honey never spoils, even after 3000 years!!"
 
 Rules:
 - Every idea must be UNIQUE and different from the past topics
@@ -81,7 +83,7 @@ async def generate_ideas(
         for item in ideas_data[:count]:
             ideas.append(ExtractedFact(
                 title=item.get("title", ""),
-                body=item.get("body", ""),
+                body=_enforce_body_length(item.get("body", "")),
                 keywords=item.get("keywords", []),
                 yt_title=item.get("yt_title", ""),
                 yt_description=item.get("yt_description", ""),

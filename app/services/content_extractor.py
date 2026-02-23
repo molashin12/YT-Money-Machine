@@ -16,7 +16,7 @@ from typing import Optional
 from google.genai import types as genai_types
 
 from app.services.api_key_manager import get_key_manager
-from app.services.fact_extractor import ExtractedFact
+from app.services.fact_extractor import ExtractedFact, _enforce_body_length
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,6 @@ URL_PATTERNS = {
     "youtube": re.compile(r"(https?://)?(www\.)?(youtube\.com/shorts|youtu\.be)/", re.IGNORECASE),
 }
 
-# Combined prompt: analyze image AND extract fact in one call
 MERGED_EXTRACTION_PROMPT = """Analyze this image carefully and extract one interesting, surprising, or educational fact from it.
 If there's text in the image, read and use it. If in another language, translate to English.
 
@@ -36,7 +35,9 @@ If there's text in the image, read and use it. If in another language, translate
 {additional_context}
 
 Return ONLY JSON:
-{{"title":"Short catchy headline (3-6 words)","body":"A punchy, tweet-style fact in exactly 40-50 characters. Must be a complete thought — concise but not too short.","keywords":["keyword1","keyword2","keyword3","keyword4","keyword5"],"image_search_query":"Best 3-5 word search to find a PHOTO of the main subject (use person names, place names, or specific objects)","yt_title":"Catchy YouTube Shorts title (max 70 chars, include emoji)","yt_description":"Brief YouTube description (2-3 sentences, include call to action)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}
+{{"title":"Short catchy headline (3-6 words)","body":"The main fact text — MUST be between 40 and 50 characters (including spaces). Count carefully.","keywords":["keyword1","keyword2","keyword3","keyword4","keyword5"],"image_search_query":"Best 3-5 word search to find a PHOTO of the main subject (use person names, place names, or specific objects)","yt_title":"Catchy YouTube Shorts title (max 70 chars, include emoji)","yt_description":"Brief YouTube description (2-3 sentences, include call to action)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}
+
+CRITICAL: The "body" MUST be between 40 and 50 characters. Count every letter, space, and punctuation. Example of 45 chars: "Honey never spoils, even after 3000 years!!"
 
 KEYWORD RULES: If about a PERSON, first keyword = their full name. If about a PLACE, include the place name. Keywords must be specific and searchable."""
 
@@ -427,7 +428,7 @@ async def _merged_analyze_and_extract(
 
         return ExtractedFact(
             title=data.get("title", "Did You Know?"),
-            body=data.get("body", ""),
+            body=_enforce_body_length(data.get("body", "")),
             keywords=data.get("keywords", ["interesting", "facts"]),
             image_search_query=data.get("image_search_query", ""),
             yt_title=data.get("yt_title", ""),

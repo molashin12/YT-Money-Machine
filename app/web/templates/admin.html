@@ -187,6 +187,25 @@
             padding: 8px;
         }
 
+        .file-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 0.82rem;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+
+        .file-status.none {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--border);
+            color: var(--text-dim);
+        }
+
         /* Buttons */
         .btn {
             padding: 10px 20px;
@@ -799,17 +818,20 @@
 
             <div class="form-group">
                 <label>Card Template (PNG)</label>
+                <div id="ch-template-status" class="file-status none" style="display:none;"></div>
                 <input type="file" id="ch-template" accept="image/png,image/jpeg,image/webp">
             </div>
 
             <div class="form-group">
                 <label>SVG Template (Figma export)</label>
+                <div id="ch-svg-template-status" class="file-status none" style="display:none;"></div>
                 <input type="file" id="ch-svg-template" accept="image/svg+xml,.svg">
                 <small style="color:#888">Export from Figma with id="input_text", id="main_image", id="source"</small>
             </div>
 
             <div class="form-group">
                 <label>Logo (PNG)</label>
+                <div id="ch-logo-status" class="file-status none" style="display:none;"></div>
                 <input type="file" id="ch-logo" accept="image/png,image/jpeg,image/webp">
             </div>
 
@@ -882,14 +904,17 @@
                 return;
             }
 
-            list.innerHTML = channels.map(ch => `
+            list.innerHTML = channels.map(ch => {
+                const modeLabel = ch.card_mode === 'ai' ? '🤖 AI' : ch.card_mode === 'svg' ? '📐 SVG' : '🖼️ Pillow';
+                return `
                 <div class="channel-item">
                     <div class="channel-color" style="background:${ch.accent_color}"></div>
                     <div class="channel-info">
                         <h4>${ch.name}</h4>
-                        <span>${ch.slug} · ${ch.video_duration || 5}s · ${ch.sound_mode || 'random'} · ${ch.card_mode === 'ai' ? '🤖 AI' : '🖼️ Pillow'}</span>
+                        <span>${ch.slug} · ${ch.video_duration || 5}s · ${ch.sound_mode || 'random'} · ${modeLabel}</span>
                         <div class="channel-badges">
                             <span class="badge ${ch.has_template ? 'ok' : 'warn'}">${ch.has_template ? '✓ Template' : '⚠ No Template'}</span>
+                            ${ch.has_svg_template ? '<span class="badge ok">✓ SVG</span>' : ''}
                             <span class="badge ${ch.has_logo ? 'ok' : ''}">${ch.has_logo ? '✓ Logo' : 'No Logo'}</span>
                             <span class="badge" id="yt-badge-${ch.slug}">Loading...</span>
                         </div>
@@ -900,7 +925,7 @@
                         <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.slug}')">Delete</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
             // Refresh YouTube connection status badges
             channels.forEach(async ch => {
@@ -916,6 +941,19 @@
             });
         }
 
+        function _setFileStatus(id, exists, filename) {
+            const el = document.getElementById(id);
+            if (exists) {
+                el.className = 'file-status';
+                el.textContent = `✓ ${filename} uploaded`;
+                el.style.display = 'flex';
+            } else {
+                el.className = 'file-status none';
+                el.textContent = 'No file uploaded yet';
+                el.style.display = 'none';
+            }
+        }
+
         function openAddChannel() {
             document.getElementById('modal-title').textContent = 'Add Channel';
             document.getElementById('edit-slug').value = '';
@@ -929,6 +967,9 @@
             document.getElementById('ch-duration').value = '5';
             document.getElementById('ch-template').value = '';
             document.getElementById('ch-logo').value = '';
+            _setFileStatus('ch-template-status', false);
+            _setFileStatus('ch-svg-template-status', false);
+            _setFileStatus('ch-logo-status', false);
             document.getElementById('channel-modal').classList.add('show');
             loadMusicForSelect();
         }
@@ -952,6 +993,9 @@
             document.getElementById('ch-template').value = '';
             document.getElementById('ch-svg-template').value = '';
             document.getElementById('ch-logo').value = '';
+            _setFileStatus('ch-template-status', ch.has_template, 'template.png');
+            _setFileStatus('ch-svg-template-status', ch.has_svg_template, 'template.svg');
+            _setFileStatus('ch-logo-status', ch.has_logo, 'logo.png');
             document.getElementById('channel-modal').classList.add('show');
             loadMusicForSelect(ch.sound_file);
             toggleSoundFile();
