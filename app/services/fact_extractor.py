@@ -34,7 +34,7 @@ Given the following raw content, extract the SINGLE most interesting, surprising
 Format your response as JSON with these exact keys:
 {{
   "title": "Short catchy headline (3-6 words, no period)",
-  "body": "The main fact text. MUST be between 40 and 50 characters long (including spaces). Count carefully before answering.",
+  "body": "The main fact text. MUST be between 40 and 50 words long (including spaces). Count carefully before answering.",
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "image_search_query": "A single search query (3-5 words) to find a PHOTO directly related to this fact",
   "yt_title": "A catchy YouTube Shorts video title (max 70 chars, include an emoji)",
@@ -42,8 +42,8 @@ Format your response as JSON with these exact keys:
   "yt_hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"]
 }}
 
-CRITICAL — BODY CHARACTER COUNT RULES:
-- The "body" field MUST be between 40 and 50 characters (including spaces)
+CRITICAL — BODY WORD COUNT RULES:
+- The "body" field MUST be between 40 and 50 words (including spaces)
 - Count every letter, space, and punctuation mark
 - If the fact is too long, shorten it. If too short, add descriptive details
 - Example of 45 chars: "Honey never spoils, even after 3000 years!!"
