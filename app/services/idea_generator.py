@@ -25,7 +25,7 @@ AVOID these topics that were already covered:
 {past_topics}
 
 Return ONLY a JSON array:
-[{{"title":"Short headline (3-6 words)","body":"The main fact — MUST be between 25 and 35 words long. Count carefully.","keywords":["visual_kw1","visual_kw2","visual_kw3"],"yt_title":"YouTube Shorts title (max 70 chars, emoji)","yt_description":"Brief description (2-3 sentences)","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}]
+[{{"title":"Short headline (3-6 words)","body":"The main fact — MUST be between 25 and 35 words long. Count carefully.","keywords":["visual_kw1","visual_kw2","visual_kw3"],"yt_title":"YouTube Shorts title (max 70 chars, emoji)","yt_description":"SHORT description — MAX 2-3 sentences only","yt_hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"]}}]
 
 CRITICAL: Each "body" MUST be between 25 and 35 words. Count every word carefully. If too long, shorten it. If too short, add descriptive details.
 

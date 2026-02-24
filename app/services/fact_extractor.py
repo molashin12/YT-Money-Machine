@@ -38,7 +38,7 @@ Format your response as JSON with these exact keys:
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "image_search_query": "A single search query (3-5 words) to find a PHOTO directly related to this fact",
   "yt_title": "A catchy YouTube Shorts video title (max 70 chars, include an emoji)",
-  "yt_description": "A brief YouTube description (2-3 sentences, engaging, include a call to action like 'Follow for more!')",
+  "yt_description": "SHORT YouTube description — MAX 2-3 sentences only. Keep it brief and engaging.",
   "yt_hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"]
 }}
 
