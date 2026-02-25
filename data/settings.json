@@ -1,13 +1,7 @@
 {
   "api_keys": {
     "gemini": {
-      "keys": [
-        "AIzaSyDMduWGKAXFUMGxKpab53GR65vhs1DR0A0",
-        "AIzaSyC_CL2gEcTnuxbTY048HJY05bFcfC8fqNg",
-        "AIzaSyAEBeqnX1Q5IwEXxuxWOxO0tT70aJGg0rQ",
-        "AIzaSyCKY4P0eNp-WYhiEcxOG5DDzoeZPWEFaSY",
-        "AIzaSyCOXclCOS2Lc7Yrs0Svhy3zyfSw5TdKKJo"
-      ],
+      "keys": [],
       "cycling": true
     },
     "pexels": {
