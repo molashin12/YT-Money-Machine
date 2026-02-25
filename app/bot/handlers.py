@@ -44,6 +44,10 @@ class ChannelCreationStates(StatesGroup):
     waiting_for_duration = State()
 
 
+class SettingsImportStates(StatesGroup):
+    waiting_for_file = State()
+
+
 # ══════════════════════════════════════════════════════════════════════
 #  MANAGEMENT COMMANDS
 # ══════════════════════════════════════════════════════════════════════
@@ -66,7 +70,9 @@ async def cmd_start(message: Message, state: FSMContext):
         "/channels — List your channels\n"
         "/addchannel — Add a new channel\n"
         "/removechannel — Remove a channel\n"
-        "/settings — View settings summary",
+        "/settings — View settings summary\n"
+        "/export — Backup your settings to a JSON file\n"
+        "/import — Restore settings from a JSON file",
         parse_mode="Markdown",
     )
     await state.set_state(VideoGenStates.waiting_for_content)
@@ -253,6 +259,85 @@ async def cmd_settings(message: Message):
         "Manage keys and more at the web admin: `/admin`"
     )
     await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(Command("export"))
+async def cmd_export(message: Message):
+    """Export the settings.json file."""
+    from aiogram.types import FSInputFile
+    
+    if not settings_store.SETTINGS_FILE.exists():
+        await message.answer("❌ No settings file found yet.")
+        return
+        
+    file = FSInputFile(path=settings_store.SETTINGS_FILE, filename="settings.json")
+    await message.answer_document(
+        document=file,
+        caption="📥 **Your Configuration Backup**\n\nKeep this file safe! It contains all your API keys, channels, and schedules.",
+        parse_mode="Markdown"
+    )
+
+
+@router.message(Command("import"))
+async def cmd_import(message: Message, state: FSMContext):
+    """Start the settings import flow."""
+    await state.clear()
+    await state.set_state(SettingsImportStates.waiting_for_file)
+    await message.answer(
+        "📤 **Import Settings**\n\n"
+        "Please reply with your `settings.json` file.\n\n"
+        "⚠️ **WARNING:** This will OVERWRITE your current settings, keys, and channels completely. "
+        "Send /cancel to abort.",
+        parse_mode="Markdown"
+    )
+
+
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    """Cancel the current operation."""
+    await state.clear()
+    await state.set_state(VideoGenStates.waiting_for_content)
+    await message.answer("Operation cancelled.")
+
+
+@router.message(SettingsImportStates.waiting_for_file, F.document)
+async def handle_settings_import(message: Message, state: FSMContext, bot: Bot):
+    """Handle the uploaded settings.json file."""
+    import json
+    
+    document = message.document
+    if not document.file_name.endswith('.json'):
+        await message.answer("❌ Please send a valid `.json` file.")
+        return
+        
+    try:
+        # Download file
+        file = await bot.get_file(document.file_id)
+        file_bytes = await bot.download_file(file.file_path)
+        content = file_bytes.read().decode('utf-8')
+        
+        # Parse JSON and save
+        data = json.loads(content)
+        settings_store.save_settings(data)
+        
+        # Reload services
+        import app.services.api_key_manager as key_mgr
+        key_mgr.reload_key_manager()
+        from app.scheduler import reload_jobs
+        reload_jobs()
+        
+        await state.clear()
+        await state.set_state(VideoGenStates.waiting_for_content)
+        await message.answer(
+            "✅ **Settings Imported Successfully!**\n\n"
+            "All keys, channels, and cron jobs have been updated. Services have been reloaded.",
+            parse_mode="Markdown"
+        )
+    except json.JSONDecodeError:
+        await message.answer("❌ The file contains invalid JSON data.")
+    except Exception as e:
+        logger.error(f"Failed to import settings via bot: {e}")
+        await message.answer(f"❌ Failed to import: {str(e)[:100]}")
 
 
 # ══════════════════════════════════════════════════════════════════════

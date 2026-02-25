@@ -241,6 +241,40 @@ async def api_get_settings():
     return data
 
 
+@router.get("/api/settings/export")
+async def api_export_settings():
+    """Export the full settings.json file."""
+    if not settings_store.SETTINGS_FILE.exists():
+        return JSONResponse(status_code=404, content={"error": "Settings file not found"})
+    return FileResponse(
+        settings_store.SETTINGS_FILE,
+        media_type="application/json",
+        filename="settings.json"
+    )
+
+
+@router.post("/api/settings/import")
+async def api_import_settings(file: UploadFile = File(...)):
+    """Import a settings.json file."""
+    import json
+    try:
+        content = await file.read()
+        data = json.loads(content)
+        settings_store.save_settings(data)
+        
+        # Reload key manager and scheduler to pick up changes
+        reload_key_manager()
+        from app.scheduler import reload_jobs
+        reload_jobs()
+        
+        return {"ok": True, "message": "Settings imported successfully."}
+    except json.JSONDecodeError:
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON file"})
+    except Exception as e:
+        logger.error(f"Failed to import settings: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Failed to import: {str(e)}"})
+
+
 # ── Cron Jobs ──────────────────────────────────────────────────────────
 
 

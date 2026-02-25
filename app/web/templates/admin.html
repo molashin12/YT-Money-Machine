@@ -576,6 +576,7 @@
         <div class="tab" data-tab="cron">⏰ Cron Jobs</div>
         <div class="tab" data-tab="music">🎵 Music</div>
         <div class="tab" data-tab="logs">📋 Logs</div>
+        <div class="tab" data-tab="system">💾 System</div>
     </div>
 
     <!-- Content -->
@@ -750,6 +751,32 @@
                     <span class="log-badge" id="log-status">● Live</span>
                 </div>
                 <div class="log-viewer" id="log-viewer"></div>
+            </div>
+        </div>
+
+        <!-- ═══ System Tab ═══ -->
+        <div class="tab-panel" id="tab-system">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Backup & Restore</h3>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:16px;">
+                    Export all your settings, API keys, channels, and cron jobs to a JSON file, or import an existing
+                    configuration.
+                </p>
+                <div class="form-group" style="margin-bottom:24px;">
+                    <label>Export Settings</label>
+                    <button class="btn btn-primary" onclick="exportSettings()">📥 Download Settings</button>
+                </div>
+                <div class="form-group">
+                    <label>Import Settings</label>
+                    <div style="display:flex;gap:12px;align-items:center;">
+                        <input type="file" id="system-import-file" accept=".json" style="flex:1;">
+                        <button class="btn btn-danger" onclick="importSettings()">📤 Upload & Replace</button>
+                    </div>
+                    <small style="color:var(--warning);display:block;margin-top:8px;">⚠️ Warning: Importing will
+                        completely replace your current settings. Make sure to back up first!</small>
+                </div>
             </div>
         </div>
     </div>
@@ -1459,6 +1486,49 @@
             if (_logInterval) clearInterval(_logInterval);
             pollLogs(); // Initial fetch
             _logInterval = setInterval(pollLogs, 2000);
+        }
+
+        // ── System ──
+        function exportSettings() {
+            window.location.href = '/api/settings/export';
+            toast('Downloading settings...');
+        }
+
+        async function importSettings() {
+            const fileInput = document.getElementById('system-import-file');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                toast('Please select a JSON file to import', 'error');
+                return;
+            }
+
+            if (!confirm('🚨 WARNING: This will OVERWRITE all your current settings, API keys, channels, and cron jobs. Are you absolutely sure?')) {
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('file', file);
+
+            try {
+                toast('Importing settings...');
+                const res = await fetch('/api/settings/import', {
+                    method: 'POST',
+                    body: fd
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    toast('✅ Settings imported! Reloading page in 2s...', 'success');
+                    fileInput.value = '';
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    toast(`❌ Import failed: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                toast(`❌ Request failed: ${e.message}`, 'error');
+            }
         }
 
         // ── Init ──
