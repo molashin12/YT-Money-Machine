@@ -5,12 +5,13 @@ Caches downloads to avoid re-fetching.
 
 import logging
 import random
+import shutil
 from pathlib import Path
 from typing import Optional
 
 import httpx
 
-from app.config import BACKGROUNDS_DIR
+from app.config import BACKGROUNDS_DIR, CHANNELS_DIR
 from app.services.api_key_manager import get_key_manager
 
 logger = logging.getLogger(__name__)
@@ -29,24 +30,35 @@ SEARCH_QUERIES = [
 ]
 
 
-async def fetch_background_video() -> Optional[str]:
+async def fetch_background_video(channel_slug: str) -> Optional[str]:
     """
     Fetch a calming background video from Pexels.
+    Caches it per-channel to ensure consistency.
     Returns the file path to the downloaded video.
     """
-    # Check if we already have cached background videos
+    channel_dir = CHANNELS_DIR / channel_slug
+    channel_dir.mkdir(parents=True, exist_ok=True)
+    channel_bg = channel_dir / "background.mp4"
+
+    # 1. If this channel already has a cached background, always use it
+    if channel_bg.exists():
+        logger.info(f"Using channel cached background: {channel_bg}")
+        return str(channel_bg)
+
+    # 2. Check if we already have global cached background videos
     cached = list(BACKGROUNDS_DIR.glob("*.mp4"))
     if cached and len(cached) >= 3:
         choice = random.choice(cached)
-        logger.info(f"Using cached background: {choice.name}")
-        return str(choice)
+        logger.info(f"Using globally cached background: {choice.name}")
+        shutil.copy2(choice, channel_bg)
+        return str(channel_bg)
 
-    # Fetch a new video from Pexels
+    # 3. Fetch a new video from Pexels
     manager = get_key_manager()
     pexels_key = manager.get_pexels_key()
     if not pexels_key:
         logger.warning("No Pexels API key configured")
-        return _fallback_cached()
+        return _fallback_cached(channel_bg)
 
     query = random.choice(SEARCH_QUERIES)
     logger.info(f"Fetching background video from Pexels: '{query}'")
@@ -69,7 +81,7 @@ async def fetch_background_video() -> Optional[str]:
         videos = data.get("videos", [])
         if not videos:
             logger.warning("No videos found on Pexels")
-            return _fallback_cached()
+            return _fallback_cached(channel_bg)
 
         # Pick a random video from results
         random.shuffle(videos)
@@ -99,32 +111,33 @@ async def fetch_background_video() -> Optional[str]:
                 continue
 
             # Download
-            video_id = video.get("id", random.randint(1000, 9999))
-            output_path = BACKGROUNDS_DIR / f"pexels_{video_id}.mp4"
-
-            if output_path.exists():
-                logger.info(f"Video already cached: {output_path.name}")
-                return str(output_path)
-
             logger.info(f"Downloading video: {video_url}")
             async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
                 dl_resp = await client.get(video_url)
                 if dl_resp.status_code == 200:
-                    output_path.write_bytes(dl_resp.content)
-                    logger.info(f"Saved background video: {output_path.name}")
-                    return str(output_path)
+                    channel_bg.write_bytes(dl_resp.content)
+                    
+                    # Also save to global cache
+                    video_id = video.get("id", random.randint(1000, 9999))
+                    output_path = BACKGROUNDS_DIR / f"pexels_{video_id}.mp4"
+                    shutil.copy2(channel_bg, output_path)
+
+                    logger.info(f"Saved background video: {channel_bg}")
+                    return str(channel_bg)
 
         logger.warning("Could not download any Pexels video")
-        return _fallback_cached()
+        return _fallback_cached(channel_bg)
 
     except Exception as e:
         logger.error(f"Pexels API error: {e}")
-        return _fallback_cached()
+        return _fallback_cached(channel_bg)
 
 
-def _fallback_cached() -> Optional[str]:
+def _fallback_cached(channel_bg: Path) -> Optional[str]:
     """Fall back to any cached background video."""
     cached = list(BACKGROUNDS_DIR.glob("*.mp4"))
     if cached:
-        return str(random.choice(cached))
+        choice = random.choice(cached)
+        shutil.copy2(choice, channel_bg)
+        return str(channel_bg)
     return None

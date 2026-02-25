@@ -167,7 +167,7 @@ async def generate_video(
 
         # ── Step 5: Fetch background video ─────────────────────────────
         await _progress("🎬 Fetching background video...")
-        bg_video_path = await fetch_background_video()
+        bg_video_path = await fetch_background_video(channel.slug)
         if not bg_video_path:
             logger.error("No background video available")
             return None
