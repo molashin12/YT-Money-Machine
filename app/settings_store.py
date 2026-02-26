@@ -31,6 +31,7 @@ DEFAULT_SETTINGS = {
         "gemini": {"keys": [], "cycling": True},
         "pexels": {"keys": [], "cycling": False},
         "google_cse": {"keys": [], "cycling": False},
+        "reddit": {"keys": [], "cycling": True},
         "google_cse_cx": "",
         "telegram_bot_token": "",
         "youtube_oauth": {"client_id": "", "client_secret": ""},
@@ -52,6 +53,7 @@ DEFAULT_CHANNEL = {
     "sound_file": None,  # filename in assets/music/ (when sound_mode="specific")
     "video_duration": 5,
     "youtube_tokens": {},  # OAuth2 tokens for YouTube upload
+    "subreddits": [],
 }
 
 
@@ -326,6 +328,8 @@ def add_cron_job(job_data: dict) -> dict:
         "timezone": job_data.get("timezone", "Africa/Cairo"),
         "enabled": job_data.get("enabled", True),
         "telegram_chat_id": job_data.get("telegram_chat_id"),
+        "idea_source": job_data.get("idea_source", "ai"),
+        "subreddits": job_data.get("subreddits", []),
     }
     data["cron_jobs"].append(job)
     _write_settings(data)

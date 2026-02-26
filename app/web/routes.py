@@ -171,7 +171,7 @@ async def api_get_all_keys():
     """Get all API key configurations (keys are masked)."""
     data = settings_store.get_settings().get("api_keys", {})
     result = {}
-    for service in ["gemini", "pexels", "google_cse"]:
+    for service in ["gemini", "pexels", "google_cse", "reddit"]:
         svc = data.get(service, {"keys": [], "cycling": False})
         result[service] = {
             "keys": [_mask_key(k) for k in svc.get("keys", [])],
@@ -233,7 +233,7 @@ async def api_get_settings():
     """Get full settings (for admin UI)."""
     data = settings_store.get_settings()
     # Mask API keys
-    for service in ["gemini", "pexels", "google_cse"]:
+    for service in ["gemini", "pexels", "google_cse", "reddit"]:
         if service in data.get("api_keys", {}):
             data["api_keys"][service]["keys"] = [
                 _mask_key(k) for k in data["api_keys"][service].get("keys", [])

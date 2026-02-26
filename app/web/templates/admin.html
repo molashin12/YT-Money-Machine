@@ -650,6 +650,25 @@
                 </div>
             </div>
 
+            <!-- Reddit API -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>👾 Reddit API Keys (OAuth)</h3>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Create an App (Script type) at <a
+                        href="https://www.reddit.com/prefs/apps" target="_blank">reddit.com/prefs/apps</a></p>
+                <div id="reddit-keys-list"></div>
+                <div class="key-add-row">
+                    <input type="text" id="reddit-client-id" placeholder="Client ID" style="flex:1;">
+                    <input type="text" id="reddit-client-secret" placeholder="Client Secret" style="flex:1;">
+                    <button class="btn btn-primary btn-sm" onclick="addRedditKey()">Add</button>
+                </div>
+                <div class="toggle-row" style="margin-top: 16px;">
+                    <span>🔄 Cycling (Rotate accounts to avoid rate limits)</span>
+                    <div class="toggle" id="reddit-cycling" onclick="toggleCycling('reddit')"></div>
+                </div>
+            </div>
+
             <!-- Telegram Bot Token -->
             <div class="card">
                 <div class="card-header">
@@ -798,6 +817,13 @@
                     placeholder="Describe the channel's content style. E.g.: 'Educational science facts for kids, use simple language, excited tone, always include a fun comparison'"></textarea>
             </div>
 
+            <div class="form-group">
+                <label>Subreddits (for Reddit idea generation)</label>
+                <input type="text" id="ch-subreddits" placeholder="e.g. AskReddit, mildlyinteresting, todayilearned">
+                <small style="color:var(--text-dim); display:block; margin-top:4px;">Comma-separated list of subreddit
+                    names.</small>
+            </div>
+
             <div class="form-row">
                 <div class="form-group">
                     <label>Primary Color</label>
@@ -887,10 +913,31 @@
                     <input type="time" id="cron-time" value="09:00">
                 </div>
             </div>
-            <div class="form-group">
-                <label>Assign To *</label>
-                <select id="cron-member"></select>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Idea Source *</label>
+                    <select id="cron-source" onchange="toggleCronSource()">
+                        <option value="ai">🤖 AI (Gemini)</option>
+                        <option value="reddit">👾 Reddit Scraper</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Assign To *</label>
+                    <select id="cron-member"></select>
+                </div>
             </div>
+
+            <div class="form-group" id="cron-subreddits-group" style="display:none;">
+                <label>Select Subreddits *</label>
+                <div id="cron-subreddits-list"
+                    style="max-height: 150px; overflow-y: auto; background: var(--surface2); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                    <div class="empty-state" style="padding:10px;">Select a channel first</div>
+                </div>
+                <small style="color:var(--warning); display:block; margin-top:4px;">Manage subreddits in Channel
+                    settings.</small>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="closeCronModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveCronJob()">Create Job</button>
@@ -986,6 +1033,7 @@
             document.getElementById('edit-slug').value = '';
             document.getElementById('ch-name').value = '';
             document.getElementById('ch-description').value = '';
+            document.getElementById('ch-subreddits').value = '';
             document.getElementById('ch-primary').value = '#1a1a2e';
             document.getElementById('ch-accent').value = '#e94560';
             document.getElementById('ch-card-mode').value = 'pillow';
@@ -1011,6 +1059,7 @@
             document.getElementById('edit-slug').value = slug;
             document.getElementById('ch-name').value = ch.name;
             document.getElementById('ch-description').value = ch.description || '';
+            document.getElementById('ch-subreddits').value = (ch.subreddits || []).join(', ');
             document.getElementById('ch-primary').value = ch.primary_color;
             document.getElementById('ch-accent').value = ch.accent_color;
             document.getElementById('ch-card-mode').value = ch.card_mode || 'pillow';
@@ -1034,9 +1083,13 @@
 
         async function saveChannel() {
             const slug = document.getElementById('edit-slug').value;
+            const subredditsRaw = document.getElementById('ch-subreddits').value || '';
+            const subreddits = subredditsRaw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
             const data = {
                 name: document.getElementById('ch-name').value,
                 description: document.getElementById('ch-description').value,
+                subreddits: subreddits,
                 primary_color: document.getElementById('ch-primary').value,
                 accent_color: document.getElementById('ch-accent').value,
                 card_mode: document.getElementById('ch-card-mode').value,
@@ -1127,7 +1180,7 @@
             const res = await fetch('/api/keys');
             const data = await res.json();
 
-            ['gemini', 'pexels', 'google_cse'].forEach(service => {
+            ['gemini', 'pexels', 'google_cse', 'reddit'].forEach(service => {
                 const svc = data[service] || { keys: [], cycling: false };
                 const list = document.getElementById(`${service}-keys-list`);
 
@@ -1190,6 +1243,23 @@
             });
             toggle.classList.toggle('on', enabled);
             toast(`Cycling ${enabled ? 'enabled' : 'disabled'} for ${service}`);
+        }
+
+        async function addRedditKey() {
+            const clientId = document.getElementById('reddit-client-id').value.trim();
+            const clientSecret = document.getElementById('reddit-client-secret').value.trim();
+            if (!clientId || !clientSecret) { toast('Both Client ID and Secret are required', 'error'); return; }
+
+            const key = `${clientId}:${clientSecret}`;
+            await fetch(`/api/keys/reddit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key }),
+            });
+            document.getElementById('reddit-client-id').value = '';
+            document.getElementById('reddit-client-secret').value = '';
+            toast('Reddit Key added!');
+            loadKeys();
         }
 
         async function saveCseCx() {
@@ -1295,9 +1365,10 @@
                     <div class="channel-color" style="background:${job.enabled ? 'var(--success)' : 'var(--border)'}"></div>
                     <div class="channel-info">
                         <h4>${job.channel_slug}</h4>
-                        <span>${job.num_ideas} ideas · ${job.schedule_time} (Cairo) · 👤 ${_getMemberName(job.telegram_chat_id)}</span>
+                        <span>${job.num_ideas} ideas via ${job.idea_source === 'reddit' ? '👾 Reddit' : '🤖 AI'} · ${job.schedule_time} (Cairo) · 👤 ${_getMemberName(job.telegram_chat_id)}</span>
                         <div class="channel-badges">
                             <span class="badge ${job.enabled ? 'ok' : ''}">${job.enabled ? '✓ Active' : 'Disabled'}</span>
+                            ${job.idea_source === 'reddit' ? `<span class="badge" title="${(job.subreddits || []).join(', ')}">${(job.subreddits || []).length} subs</span>` : ''}
                         </div>
                     </div>
                     <div class="channel-actions">
@@ -1313,8 +1384,12 @@
             // Populate channel dropdown
             const chRes = await fetch('/api/channels');
             const channels = await chRes.json();
-            document.getElementById('cron-channel').innerHTML =
+            window._cachedChannels = channels; // Cache for subreddit fetching
+            document.getElementById('cron-channel').innerHTML = '<option value="">-- Select Channel --</option>' +
                 channels.map(ch => `<option value="${ch.slug}">${ch.name}</option>`).join('');
+
+            // Listen for channel changes to populate subreddits
+            document.getElementById('cron-channel').addEventListener('change', populateCronSubreddits);
 
             // Populate team member dropdown
             const memberSel = document.getElementById('cron-member');
@@ -1328,7 +1403,39 @@
 
             document.getElementById('cron-count').value = '10';
             document.getElementById('cron-time').value = '09:00';
+            document.getElementById('cron-source').value = 'ai';
+            toggleCronSource();
+            document.getElementById('cron-subreddits-list').innerHTML = '<div class="empty-state" style="padding:10px;">Select a channel first</div>';
+
             document.getElementById('cron-modal').classList.add('show');
+        }
+
+        function toggleCronSource() {
+            const source = document.getElementById('cron-source').value;
+            document.getElementById('cron-subreddits-group').style.display = source === 'reddit' ? 'block' : 'none';
+        }
+
+        function populateCronSubreddits() {
+            const slug = document.getElementById('cron-channel').value;
+            const list = document.getElementById('cron-subreddits-list');
+
+            if (!slug) {
+                list.innerHTML = '<div class="empty-state" style="padding:10px;">Select a channel first</div>';
+                return;
+            }
+
+            const ch = (window._cachedChannels || []).find(c => c.slug === slug);
+            if (!ch || !ch.subreddits || ch.subreddits.length === 0) {
+                list.innerHTML = '<div class="empty-state" style="padding:10px;">Channel has no subreddits configured. Edit the channel to add some.</div>';
+                return;
+            }
+
+            list.innerHTML = ch.subreddits.map(sub => `
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <input type="checkbox" id="cron-sub-${sub}" value="${sub}" class="cron-sub-cb" checked>
+                    <label for="cron-sub-${sub}">${sub}</label>
+                </div>
+            `).join('');
         }
 
         function closeCronModal() {
@@ -1337,6 +1444,17 @@
 
         async function saveCronJob() {
             const memberChatId = document.getElementById('cron-member').value;
+            const source = document.getElementById('cron-source').value;
+
+            let selectedSubs = [];
+            if (source === 'reddit') {
+                selectedSubs = Array.from(document.querySelectorAll('.cron-sub-cb:checked')).map(cb => cb.value);
+                if (selectedSubs.length === 0) {
+                    toast('Please select at least one subreddit for Reddit source', 'error');
+                    return;
+                }
+            }
+
             const data = {
                 channel_slug: document.getElementById('cron-channel').value,
                 num_ideas: parseInt(document.getElementById('cron-count').value) || 10,
@@ -1344,6 +1462,8 @@
                 timezone: 'Africa/Cairo',
                 telegram_chat_id: parseInt(memberChatId) || null,
                 enabled: true,
+                idea_source: source,
+                subreddits: selectedSubs,
             };
 
             if (!data.channel_slug) { toast('Select a channel', 'error'); return; }

@@ -111,13 +111,20 @@ async def _run_cron_job(job_config: dict):
     channel_data = settings_store.get_channel(channel_slug)
     desc = channel_data.get("description", "") if channel_data else ""
 
-    logger.info(f"Cron job firing: {channel_slug}, generating {num_ideas} ideas")
+    logger.info(f"Cron job firing: {channel_slug}, generating {num_ideas} ideas using {job_config.get('idea_source', 'ai')}")
 
-    ideas = await generate_ideas(
-        channel_slug=channel_slug,
-        count=num_ideas,
-        channel_description=desc,
-    )
+    if job_config.get("idea_source") == "reddit":
+        from app.services.reddit_scraper import scrape_reddit_ideas
+        ideas = await scrape_reddit_ideas(
+            subreddits=job_config.get("subreddits", []),
+            count=num_ideas
+        )
+    else:
+        ideas = await generate_ideas(
+            channel_slug=channel_slug,
+            count=num_ideas,
+            channel_description=desc,
+        )
 
     if not ideas:
         logger.error(f"No ideas generated for cron job {channel_slug}")
