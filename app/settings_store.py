@@ -28,10 +28,8 @@ for d in [DATA_DIR, CHANNELS_DIR, MUSIC_DIR]:
 
 DEFAULT_SETTINGS = {
     "api_keys": {
-        "gemini": {"keys": [], "cycling": True},
         "pexels": {"keys": [], "cycling": False},
         "google_cse": {"keys": [], "cycling": False},
-        "reddit": {"keys": [], "cycling": True},
         "google_cse_cx": "",
         "telegram_bot_token": "",
         "youtube_oauth": {"client_id": "", "client_secret": ""},

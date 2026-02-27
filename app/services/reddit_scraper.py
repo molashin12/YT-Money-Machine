@@ -6,49 +6,26 @@ Uses the official Reddit API via OAuth for reliability and cycle-able credential
 
 import aiohttp
 import asyncio
-import base64
 import logging
 import random
 from typing import Optional
 
-from app.services.api_key_manager import get_key_manager
 from app.services.fact_extractor import ExtractedFact
 from app.services.reddit_history import is_post_seen, mark_post_seen
 
 logger = logging.getLogger(__name__)
 
-# Reddit API base URLs
-REDDIT_AUTH_URL = "https://www.reddit.com/api/v1/access_token"
-REDDIT_OAUTH_URL = "https://oauth.reddit.com"
+# List of common, realistic browser User-Agents
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+]
 
-# Headers mimicking a standard app to reduce blocking
-USER_AGENT = "script:ai.youtubeshorts.generator:v1.0.0 (by /u/AutomatedIdeaGenerator)"
-
-
-async def _get_access_token(client_id: str, client_secret: str) -> Optional[str]:
-    """Get an OAuth token from Reddit using Client ID and Secret."""
-    auth_str = f"{client_id}:{client_secret}"
-    b64_auth = base64.b64encode(auth_str.encode()).decode()
-    
-    headers = {
-        "Authorization": f"Basic {b64_auth}",
-        "User-Agent": USER_AGENT
-    }
-    data = {"grant_type": "client_credentials"}
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(REDDIT_AUTH_URL, headers=headers, data=data) as resp:
-                if resp.status == 200:
-                    result = await resp.json()
-                    return result.get("access_token")
-                else:
-                    text = await resp.text()
-                    logger.error(f"Reddit auth failed ({resp.status}): {text}")
-                    return None
-    except Exception as e:
-        logger.error(f"Error during Reddit auth: {e}")
-        return None
+def _get_random_user_agent() -> str:
+    return random.choice(USER_AGENTS)
 
 
 def _format_fact_from_post(post: dict) -> ExtractedFact:
@@ -86,33 +63,17 @@ def _format_fact_from_post(post: dict) -> ExtractedFact:
 
 async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[ExtractedFact]:
     """
-    Scrape top/hot posts from the provided subreddits using official API.
+    Scrape top/hot posts from the provided subreddits using standard JSON endpoints.
     Filters out duplicates using reddit_history.
     """
     if not subreddits:
         logger.warning("No subreddits provided for Reddit scraper.")
         return []
 
-    # Get credentials from API manager
-    key_mgr = get_key_manager()
-    reddit_creds = key_mgr.get_reddit_key()
-    
-    if not reddit_creds or ":" not in reddit_creds:
-        logger.error("Reddit API credentials not configured properly. Format must be 'client_id:client_secret'.")
-        return []
-        
-    client_id, client_secret = reddit_creds.split(":", 1)
-    
-    logger.info(f"Authenticating with Reddit API (Client ID: {client_id[:5]}...)")
-    token = await _get_access_token(client_id, client_secret)
-    
-    if not token:
-        logger.error("Failed to authenticate with Reddit API.")
-        return []
-
+    # Rotate User-Agents to prevent instant HTTP 429 blocks
     headers = {
-        "Authorization": f"Bearer {token}",
-        "User-Agent": USER_AGENT
+        "User-Agent": _get_random_user_agent(),
+        "Accept": "application/json"
     }
 
     ideas = []
@@ -121,9 +82,10 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
     # Fetch more than we need to account for duplicates and stickies
     fetch_limit = min(max(count * 3, 25), 100) 
     
-    url = f"{REDDIT_OAUTH_URL}/r/{subs_joined}/hot?limit={fetch_limit}"
+    # Use public format instead of oauth.reddit.com
+    url = f"https://www.reddit.com/r/{subs_joined}/hot.json?limit={fetch_limit}"
     
-    logger.info(f"Scraping {fetch_limit} posts from r/{subs_joined}...")
+    logger.info(f"Scraping {fetch_limit} posts from r/{subs_joined} (No-API mode)...")
 
     try:
         async with aiohttp.ClientSession() as session:

@@ -79,7 +79,7 @@ class APIKeyManager:
             settings = get_settings()
             api_keys = settings.get("api_keys", {})
 
-            for service in ["gemini", "pexels", "google_cse", "reddit"]:
+            for service in ["gemini", "pexels", "google_cse"]:
                 svc_data = api_keys.get(service, {"keys": [], "cycling": False})
                 keys = svc_data.get("keys", [])
                 cycling = svc_data.get("cycling", False)
@@ -165,12 +165,6 @@ class APIKeyManager:
     def get_pexels_key(self) -> Optional[str]:
         """Get a Pexels API key (cycled if cycling is on)."""
         return self.get_key("pexels")
-
-    # ── Reddit helper ──────────────────────────────────────────────────
-
-    def get_reddit_key(self) -> Optional[str]:
-        """Get a Reddit API key (client_id:client_secret cycled if cycling is on)."""
-        return self.get_key("reddit")
 
     # ── Google CSE helper ──────────────────────────────────────────────
 

@@ -95,17 +95,17 @@ header "Step 1/6: Installing System Dependencies"
 
 apt-get update -qq
 
-# Python
-if command -v python3 &>/dev/null; then
-    PY_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-    success "Python $PY_VERSION found"
-else
-    info "Installing Python 3..."
-    apt-get install -y python3 python3-pip python3-venv
-fi
+# Python Setup
+info "Installing latest Python 3..."
+apt-get install -y software-properties-common
+add-apt-repository ppa:deadsnakes/ppa -y
+apt-get update -qq
 
-# Ensure pip and venv modules
-apt-get install -y python3-pip python3-venv python3-dev -qq 2>/dev/null || true
+# Install latest Python 3.13 and venv
+apt-get install -y python3.13 python3.13-venv python3.13-dev python3-pip
+
+# Map python3 to python3.13 if necessary for venv creation below
+update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
 
 # FFmpeg
 if command -v ffmpeg &>/dev/null; then
@@ -182,7 +182,7 @@ if [ -d "$VENV_DIR" ]; then
     info "Virtual environment exists — upgrading packages"
 else
     info "Creating virtual environment..."
-    python3 -m venv "$VENV_DIR"
+    python3.13 -m venv "$VENV_DIR"
 fi
 
 "$VENV_DIR/bin/pip" install --upgrade pip -q

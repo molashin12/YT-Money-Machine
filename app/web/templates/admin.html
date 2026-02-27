@@ -650,25 +650,6 @@
                 </div>
             </div>
 
-            <!-- Reddit API -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>👾 Reddit API Keys (OAuth)</h3>
-                </div>
-                <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Create an App (Script type) at <a
-                        href="https://www.reddit.com/prefs/apps" target="_blank">reddit.com/prefs/apps</a></p>
-                <div id="reddit-keys-list"></div>
-                <div class="key-add-row">
-                    <input type="text" id="reddit-client-id" placeholder="Client ID" style="flex:1;">
-                    <input type="text" id="reddit-client-secret" placeholder="Client Secret" style="flex:1;">
-                    <button class="btn btn-primary btn-sm" onclick="addRedditKey()">Add</button>
-                </div>
-                <div class="toggle-row" style="margin-top: 16px;">
-                    <span>🔄 Cycling (Rotate accounts to avoid rate limits)</span>
-                    <div class="toggle" id="reddit-cycling" onclick="toggleCycling('reddit')"></div>
-                </div>
-            </div>
-
             <!-- Telegram Bot Token -->
             <div class="card">
                 <div class="card-header">
@@ -1180,7 +1161,7 @@
             const res = await fetch('/api/keys');
             const data = await res.json();
 
-            ['gemini', 'pexels', 'google_cse', 'reddit'].forEach(service => {
+            ['gemini', 'pexels', 'google_cse'].forEach(service => {
                 const svc = data[service] || { keys: [], cycling: false };
                 const list = document.getElementById(`${service}-keys-list`);
 
@@ -1243,23 +1224,6 @@
             });
             toggle.classList.toggle('on', enabled);
             toast(`Cycling ${enabled ? 'enabled' : 'disabled'} for ${service}`);
-        }
-
-        async function addRedditKey() {
-            const clientId = document.getElementById('reddit-client-id').value.trim();
-            const clientSecret = document.getElementById('reddit-client-secret').value.trim();
-            if (!clientId || !clientSecret) { toast('Both Client ID and Secret are required', 'error'); return; }
-
-            const key = `${clientId}:${clientSecret}`;
-            await fetch(`/api/keys/reddit`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key }),
-            });
-            document.getElementById('reddit-client-id').value = '';
-            document.getElementById('reddit-client-secret').value = '';
-            toast('Reddit Key added!');
-            loadKeys();
         }
 
         async function saveCseCx() {

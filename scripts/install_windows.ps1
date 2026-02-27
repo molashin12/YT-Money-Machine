@@ -74,7 +74,7 @@ if ($python) {
 } else {
     Write-Info "Installing Python 3..."
     if ($hasWinget) {
-        winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements
+        winget install Python.Python.3.13 --accept-package-agreements --accept-source-agreements
     } else {
         Write-Err "Python 3 not found. Install from https://python.org and re-run."
     }
