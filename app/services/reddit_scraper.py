@@ -90,10 +90,16 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # Rotate User-Agents to prevent instant HTTP 429/403 blocks
+            # Use full browser headers to prevent HTTP 403/429 blocks
             headers = {
                 "User-Agent": _get_random_user_agent(),
-                "Accept": "application/json"
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1"
             }
             
             async with aiohttp.ClientSession() as session:
