@@ -87,36 +87,60 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
     
     logger.info(f"Scraping {fetch_limit} posts from r/{subs_joined} (No-API mode)...")
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status != 200:
-                    logger.error(f"Reddit API request failed ({resp.status}): {await resp.text()}")
-                    return ideas
-                
-                data = await resp.json()
-                posts = data.get("data", {}).get("children", [])
-                
-                for post_wrapper in posts:
-                    post_data = post_wrapper.get("data", {})
-                    post_id = post_data.get("name", "")  # e.g., 't3_12345'
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Rotate User-Agents to prevent instant HTTP 429/403 blocks
+            headers = {
+                "User-Agent": _get_random_user_agent(),
+                "Accept": "application/json"
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as resp:
+                    content_type = resp.headers.get("Content-Type", "")
                     
-                    if not post_id or post_data.get("stickied", False):
-                        continue
+                    if resp.status == 200 and "application/json" in content_type:
+                        data = await resp.json()
+                        posts = data.get("data", {}).get("children", [])
                         
-                    if is_post_seen(post_id):
-                        logger.debug(f"Skipping duplicate post: {post_id}")
-                        continue
+                        for child in posts:
+                            post_data = child.get("data", {})
+                            post_id = post_data.get("id")
+                            
+                            # Skip pinned stickies
+                            if post_data.get("stickied"):
+                                continue
+                                
+                            # Skip if already seen
+                            if is_post_seen(post_id):
+                                continue
+                                
+                            fact = _format_fact_from_post(post_data)
+                            if fact:
+                                ideas.append(fact)
+                                mark_post_seen(post_id)
+                                
+                            if len(ideas) >= count:
+                                break
                         
-                    # Valid fresh post
-                    ideas.append(_format_fact_from_post(post_data))
-                    mark_post_seen(post_id)
-                    
-                    if len(ideas) >= count:
+                        # If we successfully parsed JSON, exit retry loop
                         break
+                    else:
+                        text = await resp.text()
+                        logger.warning(
+                            f"Reddit API request failed (Attempt {attempt+1}/{max_retries}): "
+                            f"Status {resp.status}, Content-Type: {content_type}"
+                        )
+                        if attempt < max_retries - 1:
+                            delay = random.uniform(1.5, 3.5)
+                            logger.info(f"Retrying in {delay:.1f} seconds...")
+                            await asyncio.sleep(delay)
                         
-    except Exception as e:
-        logger.error(f"Error fetching from Reddit API: {e}")
-        
+        except Exception as e:
+            logger.error(f"Error scraping Reddit on attempt {attempt+1}: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+                
     logger.info(f"Reddit Scraper collected {len(ideas)} new ideas.")
     return ideas
