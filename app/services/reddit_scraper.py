@@ -82,14 +82,15 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
     # Fetch more than we need to account for duplicates and stickies
     fetch_limit = min(max(count * 3, 25), 100) 
     
-    # Use public format instead of oauth.reddit.com
-    url = f"https://www.reddit.com/r/{subs_joined}/hot.json?limit={fetch_limit}"
-    
     logger.info(f"Scraping {fetch_limit} posts from r/{subs_joined} (No-API mode)...")
 
     max_retries = 3
     for attempt in range(max_retries):
         try:
+            # Alternate between www and old domains per attempt to bypass blocks
+            domain = "www.reddit.com" if attempt % 2 == 0 else "old.reddit.com"
+            url = f"https://{domain}/r/{subs_joined}/hot.json?limit={fetch_limit}"
+            
             # Use full browser headers to prevent HTTP 403/429 blocks
             headers = {
                 "User-Agent": _get_random_user_agent(),
