@@ -61,6 +61,26 @@ def _format_fact_from_post(post: dict) -> ExtractedFact:
     )
 
 
+async def _scrape_pullpush_api(subreddits: list[str], count: int) -> list[dict]:
+    """Fallback scraping method using the PullPush API archive."""
+    subs_joined = ",".join(subreddits)
+    fetch_limit = min(max(count * 3, 25), 100)
+    url = f"https://api.pullpush.io/reddit/search/submission/?subreddit={subs_joined}&sort=desc&size={fetch_limit}"
+    
+    logger.info(f"Falling back to PullPush API: {url}")
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers={"User-Agent": "YouTubeShortsBot/1.0", "Accept": "application/json"}) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("data", [])
+                else:
+                    logger.warning(f"PullPush API failed with status {resp.status}")
+    except Exception as e:
+        logger.error(f"PullPush API error: {e}")
+    return []
+
+
 async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[ExtractedFact]:
     """
     Scrape top/hot posts from the provided subreddits using standard JSON endpoints.
@@ -84,7 +104,15 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
     
     logger.info(f"Scraping {fetch_limit} posts from r/{subs_joined} (No-API mode)...")
 
+    # Fetch proxy from key manager
+    from app.services.api_key_manager import get_key_manager
+    km = get_key_manager()
+    proxy_url = km.get_key("reddit_proxy") if km else None
+    if proxy_url:
+        logger.info("Using configured Reddit Proxy")
+
     max_retries = 3
+    success = False
     for attempt in range(max_retries):
         try:
             # Alternate between www and old domains per attempt to bypass blocks
@@ -103,8 +131,12 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
                 "Upgrade-Insecure-Requests": "1"
             }
             
+            kwargs = {}
+            if proxy_url:
+                kwargs["proxy"] = proxy_url
+            
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as resp:
+                async with session.get(url, headers=headers, **kwargs) as resp:
                     content_type = resp.headers.get("Content-Type", "")
                     
                     if resp.status == 200 and "application/json" in content_type:
@@ -132,6 +164,7 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
                                 break
                         
                         # If we successfully parsed JSON, exit retry loop
+                        success = True
                         break
                     else:
                         text = await resp.text()
@@ -149,5 +182,20 @@ async def scrape_reddit_ideas(subreddits: list[str], count: int = 10) -> list[Ex
             if attempt < max_retries - 1:
                 await asyncio.sleep(2)
                 
+    # Fallback to PullPush if direct scraping completely failed
+    if not success and len(ideas) < count:
+        logger.warning("Direct Reddit scraping failed. Attempting PullPush API fallback...")
+        pullpush_posts = await _scrape_pullpush_api(subreddits, count)
+        for post_data in pullpush_posts:
+            post_id = post_data.get("id")
+            if is_post_seen(post_id): continue
+                
+            fact = _format_fact_from_post(post_data)
+            if fact:
+                ideas.append(fact)
+                mark_post_seen(post_id)
+                
+            if len(ideas) >= count: break
+
     logger.info(f"Reddit Scraper collected {len(ideas)} new ideas.")
     return ideas

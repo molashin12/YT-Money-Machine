@@ -30,6 +30,7 @@ DEFAULT_SETTINGS = {
     "api_keys": {
         "pexels": {"keys": [], "cycling": False},
         "google_cse": {"keys": [], "cycling": False},
+        "reddit_proxy": {"keys": [], "cycling": False},
         "google_cse_cx": "",
         "telegram_bot_token": "",
         "youtube_oauth": {"client_id": "", "client_secret": ""},
@@ -52,6 +53,7 @@ DEFAULT_CHANNEL = {
     "video_duration": 5,
     "youtube_tokens": {},  # OAuth2 tokens for YouTube upload
     "subreddits": [],
+    "csv_last_row_index": 0,
 }
 
 
@@ -232,6 +234,15 @@ def save_channel_logo(slug: str, image_bytes: bytes) -> str:
     logo_path = ch_dir / "logo.png"
     logo_path.write_bytes(image_bytes)
     return str(logo_path)
+
+
+def save_channel_csv_ideas(slug: str, csv_bytes: bytes) -> str:
+    """Save an uploaded CSV file containing ideas for a channel."""
+    ch_dir = CHANNELS_DIR / slug
+    ch_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = ch_dir / "ideas.csv"
+    csv_path.write_bytes(csv_bytes)
+    return str(csv_path)
 
 
 # ── API Key Management ──────────────────────────────────────────────────

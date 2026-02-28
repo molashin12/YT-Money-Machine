@@ -119,6 +119,12 @@ async def _run_cron_job(job_config: dict):
             subreddits=job_config.get("subreddits", []),
             count=num_ideas
         )
+    elif job_config.get("idea_source") == "csv":
+        from app.services.csv_ideas import scrape_csv_ideas
+        ideas = await scrape_csv_ideas(
+            channel_slug=channel_slug,
+            count=num_ideas
+        )
     else:
         ideas = await generate_ideas(
             channel_slug=channel_slug,
@@ -144,7 +150,7 @@ async def _send_ideas_to_telegram(chat_id: int, job_id: str, channel_slug: str, 
         return
 
     # Store ideas temporarily for approval tracking
-    _store_pending_ideas(job_id, channel_slug, ideas)
+    _store_pending_ideas(job_id, channel_slug, ideas, job_config)
 
     # Header message
     channel_data = settings_store.get_channel(channel_slug)
@@ -160,7 +166,7 @@ async def _send_ideas_to_telegram(chat_id: int, job_id: str, channel_slug: str, 
 
     # Send each idea as a message with approve/reject buttons
     for i, idea in enumerate(ideas):
-        text = f"**{i+1}. {idea.title}**\n{idea.body}"
+        text = f"**{i+1}. {idea.title}**"
         kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="✅ Approve", callback_data=f"idea_approve:{job_id}:{i}"),
             InlineKeyboardButton(text="❌ Skip", callback_data=f"idea_skip:{job_id}:{i}"),
@@ -177,15 +183,16 @@ async def _send_ideas_to_telegram(chat_id: int, job_id: str, channel_slug: str, 
 
 # ── Pending ideas storage (in-memory for the session) ──
 
-_pending_ideas: dict = {}  # job_id -> {"channel_slug": str, "ideas": list, "approved": set}
+_pending_ideas: dict = {}  # job_id -> {"channel_slug": str, "ideas": list, "approved": set, "job_config": dict}
 
 
-def _store_pending_ideas(job_id: str, channel_slug: str, ideas: list):
+def _store_pending_ideas(job_id: str, channel_slug: str, ideas: list, job_config: dict = None):
     """Store ideas awaiting approval."""
     _pending_ideas[job_id] = {
         "channel_slug": channel_slug,
         "ideas": ideas,
         "approved": set(),
+        "job_config": job_config or {},
     }
 
 
@@ -227,6 +234,54 @@ def get_approved_ideas(job_id: str) -> list:
 def clear_pending(job_id: str):
     """Clear pending ideas after generation."""
     _pending_ideas.pop(job_id, None)
+
+
+async def fetch_single_replacement_idea(job_id: str):
+    """Fetch exactly one new idea from the original source for a job."""
+    pending = _pending_ideas.get(job_id)
+    if not pending:
+        return None
+
+    job_config = pending["job_config"]
+    if not job_config:
+        return None
+
+    channel_slug = pending["channel_slug"]
+    channel_data = settings_store.get_channel(channel_slug)
+    desc = channel_data.get("description", "") if channel_data else ""
+    
+    ideas = []
+    try:
+        if job_config.get("idea_source") == "reddit":
+            from app.services.reddit_scraper import scrape_reddit_ideas
+            ideas = await scrape_reddit_ideas(
+                subreddits=job_config.get("subreddits", []),
+                count=1
+            )
+        elif job_config.get("idea_source") == "csv":
+            from app.services.csv_ideas import scrape_csv_ideas
+            ideas = await scrape_csv_ideas(
+                channel_slug=channel_slug,
+                count=1
+            )
+        else:
+            from app.services.idea_generator import generate_ideas
+            ideas = await generate_ideas(
+                channel_slug=channel_slug,
+                count=1,
+                channel_description=desc,
+            )
+    except Exception as e:
+        logger.error(f"Error fetching replacement: {e}")
+        
+    if not ideas:
+        return None
+        
+    new_idea = ideas[0]
+    pending["ideas"].append(new_idea)
+    new_index = len(pending["ideas"]) - 1
+    
+    return new_idea, new_index
 
 
 # ── Pending video results (for per-video upload approval) ──

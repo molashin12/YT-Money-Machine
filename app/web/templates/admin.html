@@ -650,6 +650,23 @@
                 </div>
             </div>
 
+            <!-- Reddit Proxies -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🌐 Reddit Proxies</h3>
+                </div>
+                <div id="reddit_proxy-keys-list"></div>
+                <div class="key-add-row">
+                    <input type="text" id="reddit_proxy-new-key"
+                        placeholder="Paste Proxy URL (e.g. http://user:pass@ip:port)">
+                    <button class="btn btn-primary btn-sm" onclick="addKey('reddit_proxy')">Add</button>
+                </div>
+                <div class="toggle-row" style="margin-top: 16px;">
+                    <span>🔄 Cycling</span>
+                    <div class="toggle" id="reddit_proxy-cycling" onclick="toggleCycling('reddit_proxy')"></div>
+                </div>
+            </div>
+
             <!-- Telegram Bot Token -->
             <div class="card">
                 <div class="card-header">
@@ -869,6 +886,13 @@
                 <input type="file" id="ch-logo" accept="image/png,image/jpeg,image/webp">
             </div>
 
+            <div class="form-group">
+                <label>Custom Ideas (.csv) (Alternative Idea Source)</label>
+                <div id="ch-csv-ideas-status" class="file-status none" style="display:none;"></div>
+                <input type="file" id="ch-csv-ideas" accept=".csv">
+                <small style="color:#888">Expects columns: body, id, title, url</small>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveChannel()">Save Channel</button>
@@ -901,6 +925,7 @@
                     <select id="cron-source" onchange="toggleCronSource()">
                         <option value="ai">🤖 AI (Gemini)</option>
                         <option value="reddit">👾 Reddit Scraper</option>
+                        <option value="csv">📄 Custom CSV</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1023,9 +1048,11 @@
             document.getElementById('ch-duration').value = '5';
             document.getElementById('ch-template').value = '';
             document.getElementById('ch-logo').value = '';
+            document.getElementById('ch-csv-ideas').value = '';
             _setFileStatus('ch-template-status', false);
             _setFileStatus('ch-svg-template-status', false);
             _setFileStatus('ch-logo-status', false);
+            _setFileStatus('ch-csv-ideas-status', false);
             document.getElementById('channel-modal').classList.add('show');
             loadMusicForSelect();
         }
@@ -1050,9 +1077,11 @@
             document.getElementById('ch-template').value = '';
             document.getElementById('ch-svg-template').value = '';
             document.getElementById('ch-logo').value = '';
+            document.getElementById('ch-csv-ideas').value = '';
             _setFileStatus('ch-template-status', ch.has_template, 'template.png');
             _setFileStatus('ch-svg-template-status', ch.has_svg_template, 'template.svg');
             _setFileStatus('ch-logo-status', ch.has_logo, 'logo.png');
+            _setFileStatus('ch-csv-ideas-status', ch.has_csv_ideas, 'ideas.csv');
             document.getElementById('channel-modal').classList.add('show');
             loadMusicForSelect(ch.sound_file);
             toggleSoundFile();
@@ -1126,6 +1155,14 @@
                     await fetch(`/api/channels/${savedSlug}/logo`, { method: 'POST', body: fd });
                 }
 
+                // Upload CSV Ideas
+                const csvFile = document.getElementById('ch-csv-ideas').files[0];
+                if (csvFile) {
+                    const fd = new FormData();
+                    fd.append('file', csvFile);
+                    await fetch(`/api/channels/${savedSlug}/csv-ideas`, { method: 'POST', body: fd });
+                }
+
                 toast(slug ? 'Channel updated!' : 'Channel created!');
                 closeModal();
                 loadChannels();
@@ -1161,7 +1198,7 @@
             const res = await fetch('/api/keys');
             const data = await res.json();
 
-            ['gemini', 'pexels', 'google_cse'].forEach(service => {
+            ['gemini', 'pexels', 'google_cse', 'reddit_proxy'].forEach(service => {
                 const svc = data[service] || { keys: [], cycling: false };
                 const list = document.getElementById(`${service}-keys-list`);
 

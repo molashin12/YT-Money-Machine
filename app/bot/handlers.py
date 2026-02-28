@@ -541,19 +541,34 @@ async def handle_idea_approve(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("idea_skip:"))
 async def handle_idea_skip(callback: CallbackQuery):
-    """Skip a generated idea."""
-    from app.scheduler import skip_idea
+    """Skip a generated idea and automatically fetch a replacement."""
+    from app.scheduler import skip_idea, fetch_single_replacement_idea
     parts = callback.data.split(":")
     job_id = parts[1]
     index = int(parts[2])
     skip_idea(job_id, index)
+    
     await callback.answer("❌ Skipped")
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
         text = callback.message.text or ""
-        await callback.message.edit_text(f"❌ ~~{text}~~", parse_mode="Markdown")
+        await callback.message.edit_text(f"❌ ~~{text}~~\n_Fetching replacement..._", parse_mode="Markdown")
     except Exception:
         pass
+
+    # Fetch and send a replacement idea
+    replacement_data = await fetch_single_replacement_idea(job_id)
+    if replacement_data:
+        new_idea, new_index = replacement_data
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        new_text = f"**{new_index+1}. {new_idea.title}**"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Approve", callback_data=f"idea_approve:{job_id}:{new_index}"),
+            InlineKeyboardButton(text="❌ Skip", callback_data=f"idea_skip:{job_id}:{new_index}"),
+        ]])
+        await callback.message.answer(new_text, reply_markup=kb, parse_mode="Markdown")
+    else:
+        await callback.message.answer("⚠️ Could not fetch a replacement idea.")
 
 
 @router.callback_query(F.data.startswith("idea_generate:"))

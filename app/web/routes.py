@@ -102,6 +102,7 @@ async def api_list_channels():
         ch["has_template"] = (ch_dir / "template.png").exists()
         ch["has_svg_template"] = (ch_dir / "template.svg").exists()
         ch["has_logo"] = (ch_dir / "logo.png").exists()
+        ch["has_csv_ideas"] = (ch_dir / "ideas.csv").exists()
     return channels
 
 
@@ -163,6 +164,16 @@ async def api_upload_logo(slug: str, file: UploadFile = File(...)):
     return {"ok": True, "path": path}
 
 
+@router.post("/api/channels/{slug}/csv-ideas")
+async def api_upload_csv_ideas(slug: str, file: UploadFile = File(...)):
+    """Upload a custom ideas CSV for a channel."""
+    if not settings_store.get_channel(slug):
+        return JSONResponse(status_code=404, content={"error": "Channel not found"})
+    csv_bytes = await file.read()
+    path = settings_store.save_channel_csv_ideas(slug, csv_bytes)
+    return {"ok": True, "path": path}
+
+
 # ── API Key Management ─────────────────────────────────────────────────
 
 
@@ -171,7 +182,7 @@ async def api_get_all_keys():
     """Get all API key configurations (keys are masked)."""
     data = settings_store.get_settings().get("api_keys", {})
     result = {}
-    for service in ["gemini", "pexels", "google_cse"]:
+    for service in ["gemini", "pexels", "google_cse", "reddit_proxy"]:
         svc = data.get(service, {"keys": [], "cycling": False})
         result[service] = {
             "keys": [_mask_key(k) for k in svc.get("keys", [])],
@@ -233,7 +244,7 @@ async def api_get_settings():
     """Get full settings (for admin UI)."""
     data = settings_store.get_settings()
     # Mask API keys
-    for service in ["gemini", "pexels", "google_cse"]:
+    for service in ["gemini", "pexels", "google_cse", "reddit_proxy"]:
         if service in data.get("api_keys", {}):
             data["api_keys"][service]["keys"] = [
                 _mask_key(k) for k in data["api_keys"][service].get("keys", [])
