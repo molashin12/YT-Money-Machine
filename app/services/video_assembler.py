@@ -64,6 +64,7 @@ def assemble_video(
                 capture_output=True,
                 text=True,
                 timeout=120,
+                stdin=subprocess.DEVNULL,
             )
 
             if result.returncode != 0:

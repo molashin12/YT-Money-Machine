@@ -129,6 +129,7 @@ async def extract_from_url(url: str, channel_description: str = "") -> dict:
                 ],
                 capture_output=True,
                 timeout=30,
+                stdin=subprocess.DEVNULL,
             )
         except Exception as e:
             logger.warning(f"FFmpeg frame extraction failed: {e}")

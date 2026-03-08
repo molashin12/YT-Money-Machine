@@ -28,6 +28,9 @@ from app.services.video_assembler import assemble_video
 
 logger = logging.getLogger(__name__)
 
+# Limit concurrent FFmpeg operations to prevent AWS server OOM / CPU starvation
+video_assemble_semaphore = asyncio.Semaphore(1)
+
 
 @dataclass
 class VideoResult:
@@ -182,13 +185,14 @@ async def generate_video(
 
         # ── Step 7: Assemble video ─────────────────────────────────────
         await _progress("🎞️ Assembling the final video...")
-        video_path = await asyncio.to_thread(
-            assemble_video,
-            card_image_bytes=card_bytes,
-            background_video_path=bg_video_path,
-            music_path=music_path,
-            duration=channel.video_duration,
-        )
+        async with video_assemble_semaphore:
+            video_path = await asyncio.to_thread(
+                assemble_video,
+                card_image_bytes=card_bytes,
+                background_video_path=bg_video_path,
+                music_path=music_path,
+                duration=channel.video_duration,
+            )
 
         if video_path:
             # Save to video history
