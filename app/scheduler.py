@@ -137,10 +137,10 @@ async def _run_cron_job(job_config: dict):
         return
 
     # Send ideas to Telegram for approval
-    await _send_ideas_to_telegram(chat_id, job_config["id"], channel_slug, ideas)
+    await _send_ideas_to_telegram(chat_id, job_config["id"], channel_slug, ideas, job_config)
 
 
-async def _send_ideas_to_telegram(chat_id: int, job_id: str, channel_slug: str, ideas: list):
+async def _send_ideas_to_telegram(chat_id: int, job_id: str, channel_slug: str, ideas: list, job_config: dict):
     """Send generated ideas to Telegram as inline keyboard messages."""
     from app.main import bot
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
