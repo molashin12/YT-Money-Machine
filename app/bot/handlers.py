@@ -403,46 +403,50 @@ async def handle_channel_selection(callback: CallbackQuery, state: FSMContext, b
         except Exception:
             pass
 
-    result = await generate_video(
-        channel_slug=channel_slug,
-        text=input_text,
-        image_bytes=input_image,
-        progress_callback=progress_callback,
-    )
+    async def _run_generation():
+        result = await generate_video(
+            channel_slug=channel_slug,
+            text=input_text,
+            image_bytes=input_image,
+            progress_callback=progress_callback,
+        )
 
-    if result:
-        try:
-            from app.scheduler import store_pending_video
-            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        if result:
+            try:
+                from app.scheduler import store_pending_video
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-            with open(result.video_path, "rb") as vf:
-                video_data = vf.read()
-            video_file = BufferedInputFile(file=video_data, filename="youtube_short.mp4")
-            await callback.message.answer_video(video=video_file, caption="✅ Your YouTube Short is ready!")
+                with open(result.video_path, "rb") as vf:
+                    video_data = vf.read()
+                video_file = BufferedInputFile(file=video_data, filename="youtube_short.mp4")
+                await callback.message.answer_video(video=video_file, caption="✅ Your YouTube Short is ready!")
 
-            # Send metadata + Upload/Skip buttons
-            vid_key = store_pending_video(channel_slug, result)
-            yt_info = "📋 **YouTube Metadata:**\n\n"
-            if result.yt_title:
-                yt_info += f"**Title:** {result.yt_title}\n\n"
-            if result.yt_description:
-                yt_info += f"**Description:**\n{result.yt_description}\n\n"
-            if result.yt_hashtags:
-                yt_info += f"**Hashtags:**\n{' '.join(result.yt_hashtags)}"
+                # Send metadata + Upload/Skip buttons
+                vid_key = store_pending_video(channel_slug, result)
+                yt_info = "📋 **YouTube Metadata:**\n\n"
+                if result.yt_title:
+                    yt_info += f"**Title:** {result.yt_title}\n\n"
+                if result.yt_description:
+                    yt_info += f"**Description:**\n{result.yt_description}\n\n"
+                if result.yt_hashtags:
+                    yt_info += f"**Hashtags:**\n{' '.join(result.yt_hashtags)}"
 
-            kb = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="📤 Upload to YouTube", callback_data=f"yt_upload:{vid_key}"),
-                InlineKeyboardButton(text="❌ Skip Upload", callback_data=f"yt_skip:{vid_key}"),
-            ]])
-            await callback.message.answer(yt_info, parse_mode="Markdown", reply_markup=kb)
-        except Exception as e:
-            logger.error(f"Failed to send video: {e}")
-            await callback.message.answer(f"✅ Video done but couldn't send: {e}")
-    else:
-        await callback.message.answer("❌ Video generation failed. Check logs.")
+                kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="📤 Upload to YouTube", callback_data=f"yt_upload:{vid_key}"),
+                    InlineKeyboardButton(text="❌ Skip Upload", callback_data=f"yt_skip:{vid_key}"),
+                ]])
+                await callback.message.answer(yt_info, parse_mode="Markdown", reply_markup=kb)
+            except Exception as e:
+                logger.error(f"Failed to send video: {e}")
+                await callback.message.answer(f"✅ Video done but couldn't send: {e}")
+        else:
+            await callback.message.answer("❌ Video generation failed. Check logs.")
 
-    await state.clear()
-    await state.set_state(VideoGenStates.waiting_for_content)
+        await state.clear()
+        await state.set_state(VideoGenStates.waiting_for_content)
+
+    import asyncio
+    asyncio.create_task(_run_generation())
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -594,68 +598,72 @@ async def handle_idea_generate(callback: CallbackQuery):
         parse_mode="Markdown",
     )
 
-    for i, idea in enumerate(approved):
-        try:
-            status_msg = await callback.message.answer(
-                f"⏳ Video {i+1}/{len(approved)}: *{idea.title}*...",
-                parse_mode="Markdown",
-            )
-
-            result = await generate_video(
-                channel_slug=channel_slug,
-                text=idea.body,
-                progress_callback=None,
-                fact_override=idea,
-            )
-
-            # Delete progress message
+    async def _run_batch_generation():
+        for i, idea in enumerate(approved):
             try:
-                await status_msg.delete()
-            except Exception:
-                pass
-
-            if result:
-                # Send video
-                with open(result.video_path, "rb") as vf:
-                    video_data = vf.read()
-                video_file = BufferedInputFile(file=video_data, filename=f"short_{i+1}.mp4")
-                await callback.message.answer_video(
-                    video=video_file,
-                    caption=f"✅ Video {i+1}/{len(approved)}: {idea.title}",
+                status_msg = await callback.message.answer(
+                    f"⏳ Video {i+1}/{len(approved)}: *{idea.title}*...",
+                    parse_mode="Markdown",
                 )
 
-                # Send metadata + Upload/Skip buttons
-                vid_key = store_pending_video(channel_slug, result)
-                meta = f"📋 **Video {i+1} Metadata:**\n"
-                if result.yt_title:
-                    meta += f"**Title:** {result.yt_title}\n"
-                if result.yt_description:
-                    meta += f"**Description:** {result.yt_description}\n"
-                if result.yt_hashtags:
-                    meta += f"**Hashtags:** {' '.join(result.yt_hashtags)}"
+                result = await generate_video(
+                    channel_slug=channel_slug,
+                    text=idea.body,
+                    progress_callback=None,
+                    fact_override=idea,
+                )
 
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                kb = InlineKeyboardMarkup(inline_keyboard=[[
-                    InlineKeyboardButton(
-                        text="📤 Upload to YouTube",
-                        callback_data=f"yt_upload:{vid_key}",
-                    ),
-                    InlineKeyboardButton(
-                        text="❌ Skip Upload",
-                        callback_data=f"yt_skip:{vid_key}",
-                    ),
-                ]])
-                await callback.message.answer(meta, parse_mode="Markdown", reply_markup=kb)
-            else:
-                await callback.message.answer(f"❌ Video {i+1} failed: {idea.title}")
+                # Delete progress message
+                try:
+                    await status_msg.delete()
+                except Exception:
+                    pass
 
-        except Exception as e:
-            logger.error(f"Failed to generate video {i+1}: {e}")
-            await callback.message.answer(f"❌ Video {i+1} error: {str(e)[:100]}")
+                if result:
+                    # Send video
+                    with open(result.video_path, "rb") as vf:
+                        video_data = vf.read()
+                    video_file = BufferedInputFile(file=video_data, filename=f"short_{i+1}.mp4")
+                    await callback.message.answer_video(
+                        video=video_file,
+                        caption=f"✅ Video {i+1}/{len(approved)}: {idea.title}",
+                    )
 
-    clear_pending(job_id)
-    await callback.message.answer(
-        f"🎉 **Done!** Generated {len(approved)} videos.\n"
-        "Tap 📤 on each video above to upload to YouTube as draft.",
-        parse_mode="Markdown",
-    )
+                    # Send metadata + Upload/Skip buttons
+                    vid_key = store_pending_video(channel_slug, result)
+                    meta = f"📋 **Video {i+1} Metadata:**\n"
+                    if result.yt_title:
+                        meta += f"**Title:** {result.yt_title}\n"
+                    if result.yt_description:
+                        meta += f"**Description:** {result.yt_description}\n"
+                    if result.yt_hashtags:
+                        meta += f"**Hashtags:** {' '.join(result.yt_hashtags)}"
+
+                    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                    kb = InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(
+                            text="📤 Upload to YouTube",
+                            callback_data=f"yt_upload:{vid_key}",
+                        ),
+                        InlineKeyboardButton(
+                            text="❌ Skip Upload",
+                            callback_data=f"yt_skip:{vid_key}",
+                        ),
+                    ]])
+                    await callback.message.answer(meta, parse_mode="Markdown", reply_markup=kb)
+                else:
+                    await callback.message.answer(f"❌ Video {i+1} failed: {idea.title}")
+
+            except Exception as e:
+                logger.error(f"Failed to generate video {i+1}: {e}")
+                await callback.message.answer(f"❌ Video {i+1} error: {str(e)[:100]}")
+
+        clear_pending(job_id)
+        await callback.message.answer(
+            f"🎉 **Done!** Generated {len(approved)} videos.\n"
+            "Tap 📤 on each video above to upload to YouTube as draft.",
+            parse_mode="Markdown",
+        )
+
+    import asyncio
+    asyncio.create_task(_run_batch_generation())
