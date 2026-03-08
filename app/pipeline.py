@@ -153,7 +153,8 @@ async def generate_video(
         else:
             await _progress("🎨 Building card with Pillow...")
             from app.services.card_builder_pillow import build_card_pillow
-            card_bytes = build_card_pillow(
+            card_bytes = await asyncio.to_thread(
+                build_card_pillow,
                 channel=channel,
                 title=fact.title,
                 body=fact.body,
@@ -181,7 +182,8 @@ async def generate_video(
 
         # ── Step 7: Assemble video ─────────────────────────────────────
         await _progress("🎞️ Assembling the final video...")
-        video_path = assemble_video(
+        video_path = await asyncio.to_thread(
+            assemble_video,
             card_image_bytes=card_bytes,
             background_video_path=bg_video_path,
             music_path=music_path,

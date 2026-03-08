@@ -189,11 +189,17 @@ async def upload_to_youtube(
         )
 
         logger.info(f"Uploading video to YouTube: {title}")
-        response = None
-        while response is None:
-            status, response = request.next_chunk()
-            if status:
-                logger.info(f"Upload progress: {int(status.progress() * 100)}%")
+        
+        def run_upload():
+            resp = None
+            while resp is None:
+                status, resp = request.next_chunk()
+                if status:
+                    logger.info(f"Upload progress: {int(status.progress() * 100)}%")
+            return resp
+
+        import asyncio
+        response = await asyncio.to_thread(run_upload)
 
         video_id = response.get("id")
         if video_id:

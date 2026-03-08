@@ -117,7 +117,9 @@ async def extract_from_url(url: str, channel_description: str = "") -> dict:
         import subprocess
 
         try:
-            subprocess.run(
+            import asyncio
+            await asyncio.to_thread(
+                subprocess.run,
                 [
                     "ffmpeg", "-i", str(video_path),
                     "-vf", "select=eq(n\\,30)",
@@ -145,92 +147,100 @@ async def extract_from_url(url: str, channel_description: str = "") -> dict:
 
 async def _download_ytdlp(url: str, tmp_dir: str) -> tuple:
     """Download video with yt-dlp. Returns (video_path, title, description)."""
-    try:
-        import yt_dlp
+    def do_download():
+        try:
+            import yt_dlp
 
-        ydl_opts = {
-            "outtmpl": f"{tmp_dir}/%(id)s.%(ext)s",
-            "format": "best[height<=720]/best/bestvideo+bestaudio",
-            "noplaylist": True,
-            "quiet": True,
-            "no_warnings": True,
-            "merge_output_format": "mp4",
-            "socket_timeout": 30,
-            "retries": 2,
-            # Bypass login requirements
-            "extractor_args": {
-                "instagram": {"skip": ["login"]},
-                "facebook": {"skip": ["login"]},
-            },
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                              "AppleWebKit/537.36 (KHTML, like Gecko) "
-                              "Chrome/120.0.0.0 Safari/537.36",
-            },
-        }
+            ydl_opts = {
+                "outtmpl": f"{tmp_dir}/%(id)s.%(ext)s",
+                "format": "best[height<=720]/best/bestvideo+bestaudio",
+                "noplaylist": True,
+                "quiet": True,
+                "no_warnings": True,
+                "merge_output_format": "mp4",
+                "socket_timeout": 30,
+                "retries": 2,
+                # Bypass login requirements
+                "extractor_args": {
+                    "instagram": {"skip": ["login"]},
+                    "facebook": {"skip": ["login"]},
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                  "Chrome/120.0.0.0 Safari/537.36",
+                },
+            }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get("title", "")
-            desc = info.get("description", "")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                title = info.get("title", "")
+                desc = info.get("description", "")
 
-            # Find downloaded file
-            for f in Path(tmp_dir).iterdir():
-                if f.is_file() and f.suffix in (".mp4", ".webm", ".mkv", ".mov"):
-                    logger.info(f"yt-dlp downloaded: {f.name}")
-                    return (f, title, desc)
+                # Find downloaded file
+                for f in Path(tmp_dir).iterdir():
+                    if f.is_file() and f.suffix in (".mp4", ".webm", ".mkv", ".mov"):
+                        logger.info(f"yt-dlp downloaded: {f.name}")
+                        return (f, title, desc)
 
-    except Exception as e:
-        logger.warning(f"yt-dlp download failed: {e}")
+        except Exception as e:
+            logger.warning(f"yt-dlp download failed: {e}")
 
-    return (None, "", "")
+        return (None, "", "")
+
+    import asyncio
+    return await asyncio.to_thread(do_download)
 
 
 async def _download_instaloader(url: str, tmp_dir: str) -> Optional[Path]:
     """Download Instagram video/reel using Instaloader (no login needed for public posts)."""
-    try:
-        import instaloader
+    def do_download():
+        try:
+            import instaloader
 
-        logger.info("Trying Instaloader for Instagram download...")
+            logger.info("Trying Instaloader for Instagram download...")
 
-        # Extract shortcode from URL
-        ig_match = re.search(r"instagram\.com/(?:reel|p)/([A-Za-z0-9_-]+)", url)
-        if not ig_match:
-            logger.warning("Could not extract Instagram shortcode from URL")
-            return None
+            # Extract shortcode from URL
+            ig_match = re.search(r"instagram\.com/(?:reel|p)/([A-Za-z0-9_-]+)", url)
+            if not ig_match:
+                logger.warning("Could not extract Instagram shortcode from URL")
+                return None
 
-        shortcode = ig_match.group(1)
-        logger.info(f"Instagram shortcode: {shortcode}")
+            shortcode = ig_match.group(1)
+            logger.info(f"Instagram shortcode: {shortcode}")
 
-        # Create Instaloader instance (no login)
-        L = instaloader.Instaloader(
-            download_videos=True,
-            download_video_thumbnails=False,
-            download_geotags=False,
-            download_comments=False,
-            save_metadata=False,
-            compress_json=False,
-            dirname_pattern=tmp_dir,
-            filename_pattern="{shortcode}",
-            quiet=True,
-        )
+            # Create Instaloader instance (no login)
+            L = instaloader.Instaloader(
+                download_videos=True,
+                download_video_thumbnails=False,
+                download_geotags=False,
+                download_comments=False,
+                save_metadata=False,
+                compress_json=False,
+                dirname_pattern=tmp_dir,
+                filename_pattern="{shortcode}",
+                quiet=True,
+            )
 
-        # Download the post
-        post = instaloader.Post.from_shortcode(L.context, shortcode)
-        L.download_post(post, target=Path(tmp_dir))
+            # Download the post
+            post = instaloader.Post.from_shortcode(L.context, shortcode)
+            L.download_post(post, target=Path(tmp_dir))
 
-        # Find downloaded video file
-        for f in Path(tmp_dir).rglob("*"):
-            if f.is_file() and f.suffix in (".mp4", ".webm", ".mkv", ".mov"):
-                logger.info(f"Instaloader downloaded: {f.name}")
-                return f
+            # Find downloaded video file
+            for f in Path(tmp_dir).rglob("*"):
+                if f.is_file() and f.suffix in (".mp4", ".webm", ".mkv", ".mov"):
+                    logger.info(f"Instaloader downloaded: {f.name}")
+                    return f
 
-        logger.warning("Instaloader completed but no video file found")
+            logger.warning("Instaloader completed but no video file found")
 
-    except Exception as e:
-        logger.warning(f"Instaloader download failed: {e}")
+        except Exception as e:
+            logger.warning(f"Instaloader download failed: {e}")
 
-    return None
+        return None
+
+    import asyncio
+    return await asyncio.to_thread(do_download)
 
 
 def _transform_url(url: str) -> Optional[str]:
