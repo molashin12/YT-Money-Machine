@@ -141,6 +141,25 @@ def _read_tspan_coords(text_el: ET.Element) -> tuple[float, float]:
     return x, y
 
 
+def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> float:
+    """Heuristic to estimate pixel width of a string in a sans-serif font (like Inter)."""
+    char_width = 0.0
+    for c in text:
+        if c.isupper(): char_width += 0.65
+        elif c in "ilI1.,|/;:()[]{}!'\"": char_width += 0.25
+        elif c.islower(): char_width += 0.55
+        elif c.isdigit(): char_width += 0.55
+        elif c.isspace(): char_width += 0.35
+        elif c in "mW": char_width += 0.8
+        else: char_width += 0.55
+    
+    # Apply a multiplier for bold font
+    if is_bold:
+        char_width *= 1.05
+        
+    return char_width * font_size
+
+
 # ── Core injection functions ──────────────────────────────────────────
 
 def _compute_text_layout(
@@ -253,6 +272,7 @@ def _inject_image(
     image_bytes: Optional[bytes],
     new_y: float,
     svg_width: float,
+    original_svg_width: float = 0,
 ) -> dict:
     """
     Replace the image inside id="main_image" with a base64 data URI.
@@ -282,10 +302,10 @@ def _inject_image(
 
     if tag_local == "g":
         # ── Figma pattern-based structure ──
-        return _inject_image_figma_group(root, el, image_bytes, new_y, svg_width)
+        return _inject_image_figma_group(root, el, image_bytes, new_y, svg_width, original_svg_width)
     else:
         # ── Simple <image> element ──
-        return _inject_image_simple(el, image_bytes, new_y, svg_width)
+        return _inject_image_simple(el, image_bytes, new_y, svg_width, original_svg_width)
 
 
 def _inject_image_figma_group(
@@ -294,6 +314,7 @@ def _inject_image_figma_group(
     image_bytes: Optional[bytes],
     new_y: float,
     svg_width: float,
+    original_svg_width: float = 0,
 ) -> dict:
     """Handle Figma's <g> → <rect fill=url(#pattern)> → <pattern> → <image> chain."""
     # Find the <rect> child of the group
@@ -311,7 +332,9 @@ def _inject_image_figma_group(
 
     # Read the rect's original dimensions
     img_x = _get_float(rect_el, "x", svg_width * 0.05)
-    img_w = _get_float(rect_el, "width", svg_width * 0.9)
+    width_diff = svg_width - original_svg_width if original_svg_width else 0
+    img_w = _get_float(rect_el, "width", svg_width * 0.9) + width_diff
+    rect_el.set("width", str(img_w))
     img_h = _get_float(rect_el, "height", DEFAULT_IMAGE_HEIGHT)
     natural_w = img_w  # track what width the image naturally wants
 
@@ -496,10 +519,13 @@ def _inject_image_simple(
     image_bytes: Optional[bytes],
     new_y: float,
     svg_width: float,
+    original_svg_width: float = 0,
 ) -> dict:
     """Handle a simple <image id="main_image" .../> element."""
     img_x = _get_float(el, "x", svg_width * 0.05)
-    img_w = _get_float(el, "width", svg_width * 0.9)
+    width_diff = svg_width - original_svg_width if original_svg_width else 0
+    img_w = _get_float(el, "width", svg_width * 0.9) + width_diff
+    el.set("width", str(img_w))
     img_h = _get_float(el, "height", DEFAULT_IMAGE_HEIGHT)
     natural_w = img_w
 
@@ -567,6 +593,8 @@ def _resize_svg(root, svg_width, new_height, original_width=0):
     root.set("height", str(int(new_height)))
     root.set("viewBox", f"0 0 {int(svg_width)} {int(new_height)}")
 
+    width_diff = svg_width - original_width
+
     # Find and expand background rects.
     # Strategy: any rect whose fill is NOT a pattern URL is a candidate.
     # The background rect is typically the one with the largest area.
@@ -586,10 +614,123 @@ def _resize_svg(root, svg_width, new_height, original_width=0):
             best_area = area
             best_rect = rect
 
+    for rect in root.iter(f"{{{SVG_NS}}}rect"):
+        fill = rect.get("fill", "")
+        if fill.startswith("url("):
+            continue
+        try:
+            rw = float(rect.get("width", "0").replace("px", ""))
+        except ValueError:
+            continue
+        
+        if rw >= original_width * 0.8 and rect != best_rect:
+            rect.set("width", str(int(rw + width_diff)))
+
     if best_rect is not None:
         best_rect.set("width", str(int(svg_width)))
         best_rect.set("height", str(int(new_height)))
         logger.info(f"Background rect -> {int(svg_width)}x{int(new_height)}")
+
+    if width_diff > 0:
+        more_el = _find_by_id(root, "More")
+        if more_el is not None:
+            current_transform = more_el.get("transform", "")
+            more_el.set("transform", f"{current_transform} translate({width_diff} 0)".strip())
+
+
+def _inject_channel_info(root: ET.Element, channel: ChannelConfig) -> None:
+    """
+    Inject channel info (Avatar, Name, Handle) and reposition Checkmark if Name length changes.
+    """
+    # 1. Update Avatar
+    avatar_el = _find_by_id(root, "Avatar")
+    if avatar_el is not None and channel.logo_path:
+        logo_path = Path(channel.logo_path)
+        if logo_path.exists():
+            try:
+                # Find the element with a fill="url(#pattern...)" inside Avatar
+                for child in avatar_el.iter():
+                    fill = child.get("fill", "")
+                    if fill.startswith("url(#"):
+                        pattern_id = fill[5:-1]
+                        image_bytes = logo_path.read_bytes()
+                        rect_w = (_get_float(child, "r", 16) * 2) or _get_float(child, "width", 32)
+                        rect_h = rect_w
+                        _replace_pattern_image(root, pattern_id, image_bytes, rect_w, rect_h)
+                        break
+            except Exception as e:
+                logger.error(f"Failed to inject avatar: {e}")
+
+    # 2. Update Name and push Checkmark
+    name_el = _find_by_id(root, "Name")
+    if name_el is not None and channel.name:
+        text_el = None
+        for child in name_el:
+            if child.tag.endswith("text"):
+                text_el = child
+                break
+        
+        if text_el is not None:
+            tspan = None
+            for child in text_el:
+                if child.tag.endswith("tspan"):
+                    tspan = child
+                    break
+            
+            orig_text = tspan.text if tspan is not None and tspan.text else text_el.text or ""
+            new_text = channel.name
+
+            fs = _get_float(text_el, "font-size", 12)
+            font_weight = text_el.get("font-weight", "") + text_el.get("style", "")
+            is_bold = "bold" in font_weight or "700" in font_weight
+
+            if tspan is not None:
+                tspan.text = new_text
+            else:
+                text_el.text = new_text
+
+            if orig_text:
+                orig_w = _estimate_text_width(orig_text, fs, is_bold)
+                new_w = _estimate_text_width(new_text, fs, is_bold)
+                diff = new_w - orig_w
+
+                # Find checkmark and adjust position
+                check_el = _find_by_id(name_el, "Check")
+                if check_el is not None:
+                    curr_transform = check_el.get("transform", "")
+                    check_el.set("transform", f"{curr_transform} translate({diff} 0)".strip())
+    
+    # 3. Update Handle (username)
+    handle_el = None
+    for node in root.iter():
+        if node.get("id", "").startswith("@"):
+            handle_el = node
+            break
+            
+    if handle_el is not None and channel.slug:
+        if handle_el.tag.endswith("text"):
+            tspan = handle_el.find("{http://www.w3.org/2000/svg}tspan")
+            if tspan is not None:
+                tspan.text = f"@{channel.slug}"
+            else:
+                handle_el.text = f"@{channel.slug}"
+        else:
+            # It's a group <g>. Figma sometimes exports the @ character and the handle as separate <text> nodes.
+            # We want to replace the first one and delete the rest so as to not leave a trailing overlap.
+            texts = list(handle_el.findall(".//{http://www.w3.org/2000/svg}text"))
+            if texts:
+                first_text = texts[0]
+                tspan = first_text.find("{http://www.w3.org/2000/svg}tspan")
+                if tspan is not None:
+                    tspan.text = f"@{channel.slug}"
+                else:
+                    first_text.text = f"@{channel.slug}"
+                    
+                parent_map = {c: p for p in handle_el.iter() for c in p}
+                for extra in texts[1:]:
+                    p = parent_map.get(extra)
+                    if p is not None:
+                        p.remove(extra)
 
 
 # ── Main entry point ──────────────────────────────────────────────────
@@ -661,16 +802,32 @@ async def build_card_svg(
                     f"font={template_font}px")
     else:
         # Only shrink font if too many lines at original width
+        found = False
         for try_font in range(int(template_font) - 1, int(MIN_FONT_SIZE) - 1, -1):
             layout = _compute_text_layout(body, svg_w, text_x, float(try_font))
             if layout["num_lines"] <= MAX_TEXT_LINES:
                 best_font = float(try_font)
+                found = True
                 logger.info(f"Text fits with smaller font: {layout['num_lines']} lines, "
                             f"font={best_font}px")
                 break
-        else:
+        
+        # If shrinking to MIN_FONT_SIZE wasn't enough, expand the width of the card
+        if not found:
             best_font = MIN_FONT_SIZE
-            logger.warning(f"Text still long — using min font {MIN_FONT_SIZE}px")
+            for try_width in range(int(svg_w) + 10, int(MAX_CARD_WIDTH) + 1, 10):
+                layout = _compute_text_layout(body, float(try_width), text_x, MIN_FONT_SIZE)
+                if layout["num_lines"] <= MAX_TEXT_LINES:
+                    best_width = float(try_width)
+                    found = True
+                    logger.info(f"Text fits with wider card: width={best_width}px, "
+                                f"font={best_font}px")
+                    break
+            
+            if not found:
+                best_width = MAX_CARD_WIDTH
+                layout = _compute_text_layout(body, best_width, text_x, MIN_FONT_SIZE)
+                logger.warning(f"Text STILL long — using max width {MAX_CARD_WIDTH}px and min font {MIN_FONT_SIZE}px")
 
     logger.info(f"Dynamic layout decided: width={best_width:.0f}, font={best_font}px "
                 f"(template: {svg_w:.0f}w, {template_font}px)")
@@ -685,7 +842,7 @@ async def build_card_svg(
 
     # ── 2. Inject image ──
     image_y = text_bottom + TEXT_TO_IMAGE_GAP
-    img_info = _inject_image(root, related_image, image_y, best_width)
+    img_info = _inject_image(root, related_image, image_y, best_width, original_svg_width=svg_w)
     image_bottom = img_info["img_y"] + img_info["img_height"]
 
     # ── 3. Inject source ──
@@ -693,16 +850,28 @@ async def build_card_svg(
     source_y = image_bottom + IMAGE_TO_SOURCE_GAP
     _inject_source(root, source_text, source_y, x=text_info["x"])
 
+    # ── X. Inject Channel Avatar and Name ──
+    # We skip dynamic injection for now since Figma templates have these statically designed correctly
+    # _inject_channel_info(root, channel)
+
     # ── 4. Compute final dimensions ──
     new_height = source_y + BOTTOM_PADDING + 10
     new_height = max(new_height, original_h)
 
     _resize_svg(root, best_width, new_height, original_width=svg_w)
+    
+    # ── 5. Ensure all images have 'href' for CairoSVG compat ──
+    for img in root.iter(f"{{{SVG_NS}}}image"):
+        xh = img.get(f"{{{XLINK_NS}}}href", "")
+        if xh and not img.get("href"):
+            img.set("href", xh)
+
+    with open("test_output.svg", "wb") as f:
+        f.write(ET.tostring(root, encoding="utf-8", xml_declaration=True))
 
     # ── 5. Render → PNG ──
     try:
         import cairosvg
-
         svg_str = ET.tostring(root, encoding="unicode", xml_declaration=True)
         png_data = cairosvg.svg2png(
             bytestring=svg_str.encode("utf-8"),
@@ -710,6 +879,9 @@ async def build_card_svg(
             output_height=int(new_height),
         )
         logger.info(f"SVG → PNG: {len(png_data)} bytes, {int(best_width)}×{int(new_height)}")
+    except (ImportError, OSError):
+        logger.warning("cairosvg is not installed or missing DLLs. Skipping PNG render.")
+        return ET.tostring(root, encoding="utf-8", xml_declaration=True)
     except Exception as e:
         logger.exception(f"CairoSVG render failed: {e}")
         return None
