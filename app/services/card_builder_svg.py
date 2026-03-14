@@ -19,6 +19,7 @@ import base64
 import io
 import logging
 import re
+import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional
@@ -30,6 +31,7 @@ from app.config import (
     VIDEO_WIDTH,
     VIDEO_HEIGHT,
     CARD_MARGIN,
+    FONTS_DIR,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,18 +80,161 @@ def _get_float(elem: ET.Element, attr: str, default: float = 0) -> float:
 
 
 def _svg_dims(root: ET.Element) -> tuple[float, float]:
-    """Return (width, height) of the SVG root."""
-    w = _get_float(root, "width", 0)
-    h = _get_float(root, "height", 0)
-    # If width/height are missing, try viewBox
-    if w == 0 or h == 0:
-        vb = root.get("viewBox", "")
-        if vb:
-            parts = vb.replace(",", " ").split()
-            if len(parts) == 4:
-                w = float(parts[2])
-                h = float(parts[3])
-    return w or 500, h or 800
+    """Get the standard width and height from viewBox or width/height attributes."""
+    try:
+        w = float(root.get("width", "0").replace("px", ""))
+        h = float(root.get("height", "0").replace("px", ""))
+        if w > 0 and h > 0:
+            return w, h
+    except:
+        pass
+
+    viewBox = root.get("viewBox")
+    if viewBox:
+        parts = viewBox.split()
+        if len(parts) == 4:
+            return float(parts[2]), float(parts[3])
+    return 320.0, 500.0
+
+
+def _embed_font(root: ET.Element):
+    """
+    Embed the Inter font as a base64 Data URI inside the SVG to fix font width variations across OS.
+    If 'Inter' font is missing on an AWS Linux server, text renders wider and overlaps static checkmarks.
+    """
+    font_path = FONTS_DIR / "Inter.ttf"
+    if not font_path.exists():
+        logger.warning(f"Font not found at {font_path}, cannot embed font inline.")
+        return
+    
+    try:
+        font_bytes = font_path.read_bytes()
+        b64_font = base64.b64encode(font_bytes).decode("utf-8")
+        
+        defs = root.find(f"{{{SVG_NS}}}defs")
+        if defs is None:
+            defs = ET.Element(f"{{{SVG_NS}}}defs")
+            root.insert(0, defs)
+            
+        style = ET.SubElement(defs, f"{{{SVG_NS}}}style")
+        style.text = f"""
+        @font-face {{
+            font-family: 'Inter';
+            src: url(data:font/ttf;base64,{b64_font}) format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }}
+        @font-face {{
+            font-family: 'Inter';
+            src: url(data:font/ttf;base64,{b64_font}) format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }}
+        """
+        logger.info("Embedded Inter font as Base64 in SVG defs.")
+    except Exception as e:
+        logger.error(f"Failed to embed font: {e}")
+
+
+def _fix_figma_patterns_for_cairosvg(root: ET.Element):
+    """
+    Figma uses <pattern> fills for the Profile Avatar.
+    CairoSVG frequently fails to render these or leaves them corrupted.
+    We parse the SVG, find any shapes using a pattern that has an image, and rewrite them 
+    into <image clip-path="..."> elements which CairoSVG handles perfectly.
+    """
+    defs = root.find(f"{{{SVG_NS}}}defs")
+    if defs is None:
+        return
+
+    pattern_to_image = {}
+    for pat in root.findall(f".//{{{SVG_NS}}}pattern"):
+        pat_id = pat.get("id")
+        
+        use_el = pat.find(f"{{{SVG_NS}}}use")
+        href = None
+        
+        if use_el is not None:
+            href_ref = use_el.get(f"{{{XLINK_NS}}}href") or use_el.get("href")
+            if href_ref and href_ref.startswith("#"):
+                ref_img = _find_by_id(root, href_ref[1:])
+                if ref_img is not None:
+                    href = ref_img.get(f"{{{XLINK_NS}}}href") or ref_img.get("href")
+        
+        if not href:
+            image_el = pat.find(f"{{{SVG_NS}}}image")
+            if image_el is not None:
+                href = image_el.get(f"{{{XLINK_NS}}}href") or image_el.get("href")
+                
+        if pat_id and href:
+            pattern_to_image[f"url(#{pat_id})"] = href
+
+    if not pattern_to_image:
+        return
+
+    for parent in list(root.iter()):
+        for child in list(parent):
+            fill = child.get("fill", "")
+            if fill in pattern_to_image:
+                img_href = pattern_to_image[fill]
+                shape_tag = child.tag.split("}")[-1]
+                
+                if shape_tag not in ("circle", "rect", "ellipse"):
+                    continue
+
+                clip_id = f"clip_{uuid.uuid4().hex[:8]}"
+                clip_path = ET.Element(f"{{{SVG_NS}}}clipPath", {"id": clip_id})
+                
+                shape_copy = ET.Element(child.tag, child.attrib)
+                if "fill" in shape_copy.attrib:
+                    del shape_copy.attrib["fill"]
+                if "id" in shape_copy.attrib:
+                    del shape_copy.attrib["id"] 
+                clip_path.append(shape_copy)
+                defs.append(clip_path)
+
+                x, y, w, h = "0", "0", "100", "100"
+                if shape_tag == "circle":
+                    cx = float(child.get("cx", 0))
+                    cy = float(child.get("cy", 0))
+                    r = float(child.get("r", 0))
+                    x = str(cx - r)
+                    y = str(cy - r)
+                    w = str(r * 2)
+                    h = str(r * 2)
+                elif shape_tag == "ellipse":
+                    cx = float(child.get("cx", 0))
+                    cy = float(child.get("cy", 0))
+                    rx = float(child.get("rx", 0))
+                    ry = float(child.get("ry", 0))
+                    x = str(cx - rx)
+                    y = str(cy - ry)
+                    w = str(rx * 2)
+                    h = str(ry * 2)
+                elif shape_tag == "rect":
+                    x = child.get("x", "0")
+                    y = child.get("y", "0")
+                    w = child.get("width", "100")
+                    h = child.get("height", "100")
+
+                g = ET.Element(f"{{{SVG_NS}}}g")
+                if "id" in child.attrib:
+                    g.set("id", child.get("id"))
+                    
+                ET.SubElement(g, f"{{{SVG_NS}}}image", {
+                    "x": x,
+                    "y": y,
+                    "width": w,
+                    "height": h,
+                    "href": img_href,
+                    "preserveAspectRatio": "xMidYMid slice",
+                    "clip-path": f"url(#{clip_id})"
+                })
+                
+                idx = list(parent).index(child)
+                parent.insert(idx, g)
+                parent.remove(child)
+                logger.info(f"Fixed Figma pattern fill on <{shape_tag}> -> <image clip-path>")
 
 
 def _wrap_text(text: str, max_chars: int) -> list[str]:
@@ -858,9 +1003,13 @@ async def build_card_svg(
     new_height = source_y + BOTTOM_PADDING + 10
     new_height = max(new_height, original_h)
 
+    # ── 5. Apply Core Fixes for CairoSVG / Linux Rendering ──
+    _embed_font(root)
+    _fix_figma_patterns_for_cairosvg(root)
+
     _resize_svg(root, best_width, new_height, original_width=svg_w)
     
-    # ── 5. Ensure all images have 'href' for CairoSVG compat ──
+    # ── 6. Ensure all images have 'href' for CairoSVG compat ──
     for img in root.iter(f"{{{SVG_NS}}}image"):
         xh = img.get(f"{{{XLINK_NS}}}href", "")
         if xh and not img.get("href"):
