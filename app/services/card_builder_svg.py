@@ -287,7 +287,24 @@ def _read_tspan_coords(text_el: ET.Element) -> tuple[float, float]:
 
 
 def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> float:
-    """Heuristic to estimate pixel width of a string in a sans-serif font (like Inter)."""
+    """Exact pixel width measurement using PIL if Inter font is available; fallback to heuristic."""
+    try:
+        from PIL import ImageFont, ImageDraw, Image
+        font_path = FONTS_DIR / ("Inter-Bold.ttf" if is_bold else "Inter.ttf")
+        if not font_path.exists():
+            font_path = FONTS_DIR / "Inter.ttf"  # Fallback to regular if bold missing
+            
+        if font_path.exists():
+            font = ImageFont.truetype(str(font_path), int(font_size))
+            dummy_img = Image.new("RGB", (1, 1))
+            draw = ImageDraw.Draw(dummy_img)
+            bbox = draw.textbbox((0, 0), text, font=font)
+            return float(bbox[2] - bbox[0])
+    except Exception as e:
+        logger.warning(f"PIL font width measurement failed, using heuristic: {e}")
+        pass
+
+    # Fallback heuristic
     char_width = 0.0
     for c in text:
         if c.isupper(): char_width += 0.65
@@ -298,9 +315,9 @@ def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> 
         elif c in "mW": char_width += 0.8
         else: char_width += 0.55
     
-    # Apply a multiplier for bold font
+    # Apply a larger multiplier for bold font in fallback
     if is_bold:
-        char_width *= 1.05
+        char_width *= 1.15
         
     return char_width * font_size
 
