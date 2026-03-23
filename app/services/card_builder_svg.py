@@ -305,6 +305,88 @@ def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> 
     return char_width * font_size
 
 
+def _reposition_checkmark(root: ET.Element) -> None:
+    """
+    Read the channel name text that is ALREADY in the template (set in Figma),
+    compute its pixel width, and translate the 'Check' group so it appears
+    right after the name with a small gap — without touching any static content.
+    """
+    name_group = _find_by_id(root, "Name")
+    if name_group is None:
+        return
+
+    # Find the <text> element inside the Name group
+    text_el = None
+    for child in name_group:
+        if child.tag.endswith("text"):
+            text_el = child
+            break
+    if text_el is None:
+        return
+
+    # Get the tspan and read the current name text + x position
+    tspan = None
+    for child in text_el:
+        if child.tag.endswith("tspan"):
+            tspan = child
+            break
+
+    name_text = (tspan.text if tspan is not None and tspan.text else text_el.text) or ""
+    if not name_text:
+        return
+
+    name_x = 0.0
+    if tspan is not None:
+        name_x = float(tspan.get("x", "0"))
+    else:
+        name_x = float(text_el.get("x", "0"))
+
+    fs = _get_float(text_el, "font-size", 12)
+    font_weight = text_el.get("font-weight", "") + text_el.get("style", "")
+    is_bold = "bold" in font_weight or "700" in font_weight
+
+    name_width = _estimate_text_width(name_text, fs, is_bold)
+    name_right_edge = name_x + name_width  # pixel x where name text ends
+
+    # Find the Check element
+    check_el = _find_by_id(root, "Check")
+    if check_el is None:
+        # Try inside the Name group
+        check_el = _find_by_id(name_group, "Check")
+    if check_el is None:
+        return
+
+    # Get the current leftmost x of the checkmark SVG path
+    # The Check group contains a <path> whose d= attribute has the coordinates.
+    # We parse the first number pair from the path to find the original x position.
+    check_min_x = None
+    for path in check_el.iter(f"{{{SVG_NS}}}path"):
+        d = path.get("d", "")
+        # Extract all numbers from the path data
+        nums = re.findall(r"[\d.]+", d)
+        if nums:
+            check_min_x = float(nums[0])  # first x coordinate in the path
+            break
+
+    if check_min_x is None:
+        return
+
+    GAP_PX = 10  # comfortable gap between name and checkmark
+    desired_x = name_right_edge + GAP_PX
+    shift = desired_x - check_min_x
+
+    if abs(shift) < 1:
+        logger.info(f"Checkmark already correctly positioned (shift={shift:.1f}px)")
+        return
+
+    # Apply translation to the Check group
+    curr_transform = check_el.get("transform", "")
+    new_transform = f"{curr_transform} translate({shift:.1f} 0)".strip()
+    check_el.set("transform", new_transform)
+    logger.info(f"Repositioned checkmark: name='{name_text}' width={name_width:.1f}px, "
+                f"shift={shift:.1f}px")
+
+
 # ── Core injection functions ──────────────────────────────────────────
 
 def _compute_text_layout(
@@ -995,9 +1077,10 @@ async def build_card_svg(
     source_y = image_bottom + IMAGE_TO_SOURCE_GAP
     _inject_source(root, source_text, source_y, x=text_info["x"])
 
-    # ── X. Inject Channel Avatar and Name ──
-    # We skip dynamic injection for now since Figma templates have these statically designed correctly
-    # _inject_channel_info(root, channel)
+    # ── X. Reposition checkmark badge to sit right after the channel name ──
+    # We don't overwrite Figma's static name/avatar/handle, but we DO need
+    # to shift the checkmark so it doesn't overlap a name of different length.
+    _reposition_checkmark(root)
 
     # ── 4. Compute final dimensions ──
     new_height = source_y + BOTTOM_PADDING + 10
