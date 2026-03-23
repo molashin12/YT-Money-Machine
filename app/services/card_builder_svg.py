@@ -291,15 +291,25 @@ def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> 
     try:
         from PIL import ImageFont, ImageDraw, Image
         font_path = FONTS_DIR / ("Inter-Bold.ttf" if is_bold else "Inter.ttf")
+        using_fallback_bold = False
         if not font_path.exists():
             font_path = FONTS_DIR / "Inter.ttf"  # Fallback to regular if bold missing
+            if is_bold:
+                using_fallback_bold = True
             
         if font_path.exists():
             font = ImageFont.truetype(str(font_path), int(font_size))
             dummy_img = Image.new("RGB", (1, 1))
             draw = ImageDraw.Draw(dummy_img)
             bbox = draw.textbbox((0, 0), text, font=font)
-            return float(bbox[2] - bbox[0])
+            width = float(bbox[2] - bbox[0])
+            
+            # If CairoSVG uses synthetic bold because the bold font file is missing,
+            # it stretches the text ~10-15% wider than the PIL Regular measurement.
+            if using_fallback_bold:
+                width *= 1.15
+                
+            return width
     except Exception as e:
         logger.warning(f"PIL font width measurement failed, using heuristic: {e}")
         pass
