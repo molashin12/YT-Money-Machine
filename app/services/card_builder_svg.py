@@ -288,6 +288,12 @@ def _read_tspan_coords(text_el: ET.Element) -> tuple[float, float]:
 
 def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> float:
     """Exact pixel width measurement using PIL if Inter font is available; fallback to heuristic."""
+    # CairoSVG / Pango evaluates unitless `font-size="12"` as 12pt (16px physical pixels).
+    # Since SVG coordinate space (and PIL) assumes 1 user-unit = 1px, CairoSVG bloats the 
+    # text width by exactly 33.3% (96/72 DPI ratio) relative to the SVG shapes.
+    # We must scale our measured width up by 1.3333 to match Cairo's final rendered footprint.
+    PANGO_SCALE = 96.0 / 72.0 
+    
     try:
         from PIL import ImageFont, ImageDraw, Image
         font_path = FONTS_DIR / ("Inter-Bold.ttf" if is_bold else "Inter.ttf")
@@ -304,10 +310,13 @@ def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> 
             bbox = draw.textbbox((0, 0), text, font=font)
             width = float(bbox[2] - bbox[0])
             
+            # Apply CairoSVG DPI text bloat scale
+            width *= PANGO_SCALE
+            
             # If CairoSVG uses synthetic bold because the bold font file is missing,
             # it stretches the text ~10-15% wider than the PIL Regular measurement.
             if using_fallback_bold:
-                width *= 1.15
+                width *= 1.12
                 
             return width
     except Exception as e:
@@ -325,9 +334,12 @@ def _estimate_text_width(text: str, font_size: float, is_bold: bool = False) -> 
         elif c in "mW": char_width += 0.8
         else: char_width += 0.55
     
+    # Apply CairoSVG DPI text bloat scale
+    char_width *= PANGO_SCALE
+    
     # Apply a larger multiplier for bold font in fallback
     if is_bold:
-        char_width *= 1.15
+        char_width *= 1.12
         
     return char_width * font_size
 
