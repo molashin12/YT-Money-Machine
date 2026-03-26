@@ -52,12 +52,7 @@ async def scrape_csv_ideas(channel_slug: str, count: int = 1) -> list[ExtractedF
                 
                 if not body:
                     body = title
-                
-                # Truncate logic similar to reddit
-                words = body.split()
-                if len(words) > 50:
-                    body = " ".join(words[:50]) + "..."
-                if len(words) < 15 and body != title:
+                elif title not in body:
                     body = f"{title}. {body}"
                     
                 yt_title = f"{title[:60]}... 🤯" if len(title) > 60 else f"{title} 🤯"

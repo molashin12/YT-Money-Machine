@@ -34,17 +34,11 @@ def _format_fact_from_post(post: dict) -> ExtractedFact:
     body = post.get("selftext", "")
     subreddit = post.get("subreddit", "")
     
-    # If the post has no body, the title is the main fact.
+    # Pass the full body and title. The video pipeline will use Gemini to
+    # extract the most interesting fact from this raw text later.
     if not body.strip():
         body = title
-    
-    # Trim body to fit within constraints of a short video body if necessary
-    # (Though we rely on video generator TTS not Gemini for exact word counts here, 
-    # it's usually good to keep it relatively brief)
-    words = body.split()
-    if len(words) > 50:
-        body = " ".join(words[:50]) + "..."
-    if len(words) < 15 and body != title:
+    elif title not in body:
         body = f"{title}. {body}"
 
     # Generate visually descriptive mockup properties

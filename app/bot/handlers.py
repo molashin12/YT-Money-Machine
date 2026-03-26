@@ -608,9 +608,8 @@ async def handle_idea_generate(callback: CallbackQuery):
 
                 result = await generate_video(
                     channel_slug=channel_slug,
-                    text=idea.body,
+                    text=f"{idea.title}\n\n{idea.body}",
                     progress_callback=None,
-                    fact_override=idea,
                 )
 
                 # Delete progress message
