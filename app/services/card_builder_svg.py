@@ -831,19 +831,39 @@ def _resize_svg(root, svg_width, new_height, original_width=0):
     width_diff = svg_width - original_width
 
     # Find and expand background rects.
-    # Strategy: any rect whose fill is NOT a pattern URL is a candidate.
-    # The background rect is typically the one with the largest area.
+    # Strategy: the background rect is typically the one with the largest area.
     best_rect = None
     best_area = 0
     for rect in root.iter(f"{{{SVG_NS}}}rect"):
         fill = rect.get("fill", "")
+        # Check if fill is an image pattern (skip it) vs a gradient (keep it)
         if fill.startswith("url("):
-            continue  # skip image pattern rects
+            pattern_id = fill[5:-1].strip("'\"")
+            # find the defs element to see if it's a pattern or gradient
+            tag = ""
+            for el in root.iter():
+                if el.get("id") == pattern_id:
+                    tag = el.tag
+                    break
+            if tag.endswith("pattern"):
+                continue  # skip image pattern rects
+
+        # Get width/height from attributes or style
         try:
-            rw = float(rect.get("width", "0").replace("px", ""))
-            rh = float(rect.get("height", "0").replace("px", ""))
+            w_val = rect.get("width", "0")
+            h_val = rect.get("height", "0")
+            if "style" in rect.attrib:
+                style = rect.get("style", "")
+                if "width:" in style:
+                    w_val = style.split("width:")[1].split(";")[0].strip()
+                if "height:" in style:
+                    h_val = style.split("height:")[1].split(";")[0].strip()
+                    
+            rw = float(w_val.replace("px", ""))
+            rh = float(h_val.replace("px", ""))
         except ValueError:
             continue
+            
         area = rw * rh
         if area > best_area:
             best_area = area
@@ -852,9 +872,22 @@ def _resize_svg(root, svg_width, new_height, original_width=0):
     for rect in root.iter(f"{{{SVG_NS}}}rect"):
         fill = rect.get("fill", "")
         if fill.startswith("url("):
-            continue
+            pattern_id = fill[5:-1].strip("'\"")
+            tag = ""
+            for el in root.iter():
+                if el.get("id") == pattern_id:
+                    tag = el.tag
+                    break
+            if tag.endswith("pattern"):
+                continue
+
         try:
-            rw = float(rect.get("width", "0").replace("px", ""))
+            w_val = rect.get("width", "0")
+            if "style" in rect.attrib:
+                style = rect.get("style", "")
+                if "width:" in style:
+                    w_val = style.split("width:")[1].split(";")[0].strip()
+            rw = float(w_val.replace("px", ""))
         except ValueError:
             continue
         
